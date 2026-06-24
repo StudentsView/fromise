@@ -6,14 +6,74 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4312A2D52FE2C04C00522F89 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 4312A2D42FE2C04C00522F89 /* Supabase */; };
+		43343E362FEB66A40095DCE9 /* DeviceActivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 43343E352FEB66A40095DCE9 /* DeviceActivity.framework */; };
+		43343E3E2FEB66A40095DCE9 /* FromiseMonitor.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 43343E342FEB66A40095DCE9 /* FromiseMonitor.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		43343E3C2FEB66A40095DCE9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4312A2962FE26F9F00522F89 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 43343E332FEB66A40095DCE9;
+			remoteInfo = FromiseMonitor;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		43343E432FEB66A40095DCE9 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				43343E3E2FEB66A40095DCE9 /* FromiseMonitor.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		4312A29E2FE26F9F00522F89 /* Fromise.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Fromise.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		43343E342FEB66A40095DCE9 /* FromiseMonitor.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FromiseMonitor.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		43343E352FEB66A40095DCE9 /* DeviceActivity.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = DeviceActivity.framework; path = System/Library/Frameworks/DeviceActivity.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		43343E422FEB66A40095DCE9 /* Exceptions for "FromiseMonitor" folder in "FromiseMonitor" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 43343E332FEB66A40095DCE9 /* FromiseMonitor */;
+		};
+		43CF8E3D2FE8CF7D00DF38A9 /* Exceptions for "Fromise" folder in "Fromise" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 4312A29D2FE26F9F00522F89 /* Fromise */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4312A2A02FE26F9F00522F89 /* Fromise */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				43CF8E3D2FE8CF7D00DF38A9 /* Exceptions for "Fromise" folder in "Fromise" target */,
+			);
 			path = Fromise;
+			sourceTree = "<group>";
+		};
+		43343E372FEB66A40095DCE9 /* FromiseMonitor */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				43343E422FEB66A40095DCE9 /* Exceptions for "FromiseMonitor" folder in "FromiseMonitor" target */,
+			);
+			path = FromiseMonitor;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -23,6 +83,15 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4312A2D52FE2C04C00522F89 /* Supabase in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		43343E312FEB66A40095DCE9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				43343E362FEB66A40095DCE9 /* DeviceActivity.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -33,6 +102,8 @@
 			isa = PBXGroup;
 			children = (
 				4312A2A02FE26F9F00522F89 /* Fromise */,
+				43343E372FEB66A40095DCE9 /* FromiseMonitor */,
+				4312A2D32FE2C04C00522F89 /* Frameworks */,
 				4312A29F2FE26F9F00522F89 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,8 +112,17 @@
 			isa = PBXGroup;
 			children = (
 				4312A29E2FE26F9F00522F89 /* Fromise.app */,
+				43343E342FEB66A40095DCE9 /* FromiseMonitor.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		4312A2D32FE2C04C00522F89 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				43343E352FEB66A40095DCE9 /* DeviceActivity.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -55,20 +135,45 @@
 				4312A29A2FE26F9F00522F89 /* Sources */,
 				4312A29B2FE26F9F00522F89 /* Frameworks */,
 				4312A29C2FE26F9F00522F89 /* Resources */,
+				43343E432FEB66A40095DCE9 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				43343E3D2FEB66A40095DCE9 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				4312A2A02FE26F9F00522F89 /* Fromise */,
 			);
 			name = Fromise;
 			packageProductDependencies = (
+				4312A2D42FE2C04C00522F89 /* Supabase */,
 			);
 			productName = Fromise;
 			productReference = 4312A29E2FE26F9F00522F89 /* Fromise.app */;
 			productType = "com.apple.product-type.application";
+		};
+		43343E332FEB66A40095DCE9 /* FromiseMonitor */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 43343E3F2FEB66A40095DCE9 /* Build configuration list for PBXNativeTarget "FromiseMonitor" */;
+			buildPhases = (
+				43343E302FEB66A40095DCE9 /* Sources */,
+				43343E312FEB66A40095DCE9 /* Frameworks */,
+				43343E322FEB66A40095DCE9 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				43343E372FEB66A40095DCE9 /* FromiseMonitor */,
+			);
+			name = FromiseMonitor;
+			packageProductDependencies = (
+			);
+			productName = FromiseMonitor;
+			productReference = 43343E342FEB66A40095DCE9 /* FromiseMonitor.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -77,11 +182,15 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2650;
+				LastSwiftUpdateCheck = 2700;
 				LastUpgradeCheck = 2650;
 				TargetAttributes = {
 					4312A29D2FE26F9F00522F89 = {
 						CreatedOnToolsVersion = 26.5;
+						LastSwiftMigration = 2650;
+					};
+					43343E332FEB66A40095DCE9 = {
+						CreatedOnToolsVersion = 27.0;
 					};
 				};
 			};
@@ -94,18 +203,29 @@
 			);
 			mainGroup = 4312A2952FE26F9F00522F89;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4312A2C82FE2ADAD00522F89 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4312A29F2FE26F9F00522F89 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				4312A29D2FE26F9F00522F89 /* Fromise */,
+				43343E332FEB66A40095DCE9 /* FromiseMonitor */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		4312A29C2FE26F9F00522F89 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		43343E322FEB66A40095DCE9 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +242,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		43343E302FEB66A40095DCE9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		43343E3D2FEB66A40095DCE9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 43343E332FEB66A40095DCE9 /* FromiseMonitor */;
+			targetProxy = 43343E3C2FEB66A40095DCE9 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		4312A2A72FE26FA000522F89 /* Debug */ = {
@@ -251,16 +386,69 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Fromise/Fromise.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 2BL2RG8A9U;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Fromise/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Fromise;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "집중 시간 카드 저장";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UILaunchStoryboardName = "";
+				INFOPLIST_KEY_UIStatusBarHidden = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.flmang.Fromise;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		4312A2AB2FE26FA000522F89 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Fromise/Fromise.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2BL2RG8A9U;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Fromise/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Fromise;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "집중 시간 카드 저장";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = "";
+				INFOPLIST_KEY_UIStatusBarHidden = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -276,33 +464,63 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
-			name = Debug;
+			name = Release;
 		};
-		4312A2AB2FE26FA000522F89 /* Release */ = {
+		43343E402FEB66A40095DCE9 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = FromiseMonitor/FromiseMonitor.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 2BL2RG8A9U;
-				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_FILE = FromiseMonitor/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = FromiseMonitor;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.flmang.Fromise;
+				PRODUCT_BUNDLE_IDENTIFIER = com.flmang.Fromise.FromiseMonitor;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		43343E412FEB66A40095DCE9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = FromiseMonitor/FromiseMonitor.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2BL2RG8A9U;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FromiseMonitor/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = FromiseMonitor;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.flmang.Fromise.FromiseMonitor;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
@@ -331,7 +549,35 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		43343E3F2FEB66A40095DCE9 /* Build configuration list for PBXNativeTarget "FromiseMonitor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				43343E402FEB66A40095DCE9 /* Debug */,
+				43343E412FEB66A40095DCE9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		4312A2C82FE2ADAD00522F89 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4312A2D42FE2C04C00522F89 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4312A2C82FE2ADAD00522F89 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 4312A2962FE26F9F00522F89 /* Project object */;
 }

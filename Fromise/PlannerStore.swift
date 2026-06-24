@@ -1,9 +1,10 @@
 import SwiftUI
+import Combine
 import PencilKit
 
 // ─────────────────────────────────────────────────────────────
-//  PlannerStore.swift — 플래너 상태 (임시 인메모리)
-//  색·타임테이블은 UInt(0xRRGGBB)로 저장 → Part 3 영속화/Supabase 연동 대비
+//  PlannerStore.swift — 플래너 상태 (days 변경 시 onChange → Supabase 저장)
+//  색·타임테이블은 UInt(0xRRGGBB)로 저장
 // ─────────────────────────────────────────────────────────────
 
 struct PlannerTask: Identifiable, Hashable {
@@ -36,7 +37,9 @@ struct DayData {
 }
 
 final class PlannerStore: ObservableObject {
-    @Published var days: [String: DayData] = [:]
+    @Published var days: [String: DayData] = [:] { didSet { onChange?() } }
+    /// days가 바뀔 때 호출 (Supabase 저장 예약 등). 로그인 시 RootFlow에서 연결.
+    var onChange: (() -> Void)? = nil
 
     func day(_ key: String) -> DayData { days[key] ?? DayData() }
 

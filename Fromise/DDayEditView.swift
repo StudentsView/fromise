@@ -35,12 +35,12 @@ struct DDayEditView: View {
                 // 이름
                 VStack(alignment: .leading, spacing: 8) {
                     Text("D-Day 이름").font(.system(size: 12, weight: .heavy)).foregroundStyle(Theme.ink3)
-                    TextField("예: 2026 수능", text: $name)
+                    TextField("예: 2027 수능", text: $name)
                         .font(.system(size: 16, weight: .bold))
                         .padding(13).background(Theme.paper)
                         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.line, lineWidth: 1))
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .onChange(of: name) { profile.examName = $0 }
+                        .onChange(of: name) { profile.examName = $1 }
                 }
                 .card()
 
@@ -50,19 +50,19 @@ struct DDayEditView: View {
                     DatePicker("", selection: $date, displayedComponents: .date)
                         .datePickerStyle(.compact).labelsHidden()
                         .environment(\.locale, Locale(identifier: "ko_KR"))
-                        .onChange(of: date) { profile.examDate = $0 }
+                        .onChange(of: date) { profile.examDate = $1 }
 
                     // 재수 토글
                     HStack(spacing: 8) {
                         if profile.isReexam {
                             Text("올해 수능에 최선을 다 해보겠습니다!")
                                 .font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.ink2)
-                            Button("클릭") { setExam(ProfileStore.defaultExam, "2026 수능") }
+                            Button("클릭") { setExam(ProfileStore.defaultExam, "2027 수능") }
                                 .font(.system(size: 13, weight: .heavy)).foregroundStyle(Theme.ink)
                         } else {
                             Text("재수가 확정되었습니까?")
                                 .font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.ink2)
-                            Button("여기를 클릭") { setExam(ProfileStore.reexamDate, "2027 수능") }
+                            Button("여기를 클릭") { setExam(ProfileStore.reexamDate, "2028 수능") }
                                 .font(.system(size: 13, weight: .heavy)).foregroundStyle(Theme.ink)
                         }
                         Spacer()

@@ -2,6 +2,7 @@ import Foundation
 import CoreMotion
 import UIKit
 import Combine
+import Supabase
 
 // ─────────────────────────────────────────────────────────────
 //  StudyTracker — "엎어서 바닥에 덮어둔 시간"만 공부 시간으로 적립
@@ -21,25 +22,58 @@ final class StudyTracker: ObservableObject {
     private let motion = CMMotionManager()
     private var faceDown = false
     private var near = false
+    private var hasProximity = false   // iPad 등 근접센서 없는 기기 대응
     private var segStart: Date?
     private var ticker: Timer?
     private let d = UserDefaults.standard
 
-    private var ymd: String { let f = DateFormatter(); f.dateFormat = "yyyyMMdd"; return f.string(from: Date()) }
+    private static let ymdFmt: DateFormatter = { let f = DateFormatter(); f.dateFormat = "yyyyMMdd"; return f }()
+    private var ymd: String { Self.ymdFmt.string(from: Date()) }
     /// 화면에 보여줄 오늘 총합(적립 중이면 실시간)
     var todaySeconds: Int { base + (segStart.map { Int(Date().timeIntervalSince($0)) } ?? 0) }
+
+    // MARK: 일별 기록 / 평균
+    struct DayStat: Identifiable {
+        let date: Date
+        let ymd: String
+        let seconds: Int       // 공부(집중) 시간
+        let twoGSeconds: Int   // 2G폰 모드 지속 시간(평균엔 미반영, 표시만)
+        var id: String { ymd }
+    }
+    /// 최근 days일치 일별 누적 집중시간 (오늘 포함, 최신순)
+    func dailyHistory(days: Int = 30) -> [DayStat] {
+        let cal = Calendar.current
+        var out: [DayStat] = []
+        for offset in 0..<days {
+            guard let date = cal.date(byAdding: .day, value: -offset, to: Date()) else { continue }
+            let key = Self.ymdFmt.string(from: date)
+            let sec = offset == 0 ? todaySeconds : d.integer(forKey: "study.\(key)")
+            let twoG = d.integer(forKey: "twoG.\(key)")
+            out.append(DayStat(date: date, ymd: key, seconds: sec, twoGSeconds: twoG))
+        }
+        return out
+    }
+    /// 최근 n일 하루 평균(초)
+    func average(days: Int) -> Int {
+        let h = dailyHistory(days: days)
+        guard !h.isEmpty else { return 0 }
+        return h.reduce(0) { $0 + $1.seconds } / h.count
+    }
+    var weeklyAverage: Int  { average(days: 7) }
+    var monthlyAverage: Int { average(days: 30) }
 
     private init() {
         base = d.integer(forKey: "study.\(ymd)")
         NotificationCenter.default.addObserver(forName: UIDevice.proximityStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.onProximity() }
+            Task { @MainActor [weak self] in self?.onProximity() }
         }
         NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.enterBG() }
+            Task { @MainActor [weak self] in self?.enterBG() }
         }
         NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.enterFG() }
+            Task { @MainActor [weak self] in self?.enterFG() }
         }
+        FocusGuard.shared.stopShield()   // 콜드스타트: 비정상 종료로 남은 차단 정리
     }
 
     // MARK: 세션
@@ -47,20 +81,24 @@ final class StudyTracker: ObservableObject {
         guard !running else { return }
         base = d.integer(forKey: "study.\(ymd)")   // 날짜 바뀜 대비 재로딩
         running = true
-        UIDevice.current.isProximityMonitoringEnabled = true
-        near = UIDevice.current.proximityState
-        startMotion()
-        ticker = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.objectWillChange.send() }
+        if !TwoGStore.shared.active {                // 2G 모드 중이면 이미 차단 중 → 중복 적용 없이 기록만
+            FocusGuard.shared.startShield()          // (단독 학습 세션) 허용 앱/사이트만 사용(화이트리스트)
         }
+        UIApplication.shared.isIdleTimerDisabled = false   // 자동 잠금 허용(배터리)
+        UIDevice.current.isProximityMonitoringEnabled = true
+        hasProximity = UIDevice.current.isProximityMonitoringEnabled   // 켜졌으면 센서 있음
+        near = hasProximity ? UIDevice.current.proximityState : true   // 없으면 face-down만으로 판정
+        startMotion()
+        startTicker()
         evaluate()
     }
     func stopSession() {
         setCounting(false)
         running = false
+        if !TwoGStore.shared.active { FocusGuard.shared.stopShield() }   // 2G 중이면 차단 유지
         UIDevice.current.isProximityMonitoringEnabled = false
         motion.stopDeviceMotionUpdates()
-        ticker?.invalidate(); ticker = nil
+        stopTicker()
         save()
     }
 
@@ -70,7 +108,7 @@ final class StudyTracker: ObservableObject {
         motion.deviceMotionUpdateInterval = 0.3
         motion.startDeviceMotionUpdates(to: .main) { [weak self] m, _ in
             guard let g = m?.gravity else { return }
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.faceDown = g.z > 0.8
                 self.evaluate()
@@ -81,31 +119,46 @@ final class StudyTracker: ObservableObject {
 
     private func evaluate() { setCounting(running && faceDown && near) }
     private func setCounting(_ on: Bool) {
-        if on, segStart == nil { segStart = Date(); counting = true }
+        if on, segStart == nil { segStart = Date(); counting = true; screenOff(); stopTicker() }   // 화면 꺼짐 → 타이머 정지(배터리)
         else if !on, let s = segStart {
             base += max(0, Int(Date().timeIntervalSince(s)))
             d.set(base, forKey: "study.\(ymd)")
-            segStart = nil; counting = false
+            segStart = nil; counting = false; screenOn(); if running { startTicker() }
         }
     }
 
-    // MARK: 백그라운드 보정
+    // MARK: UI 갱신 타이머 — 화면이 켜져 보일 때만 돌려 배터리 절약
+    private func startTicker() {
+        guard ticker == nil else { return }
+        ticker = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.objectWillChange.send() }
+        }
+    }
+    private func stopTicker() { ticker?.invalidate(); ticker = nil }
+
+    // MARK: 화면 일시 끄기 — 덮여 기록 중에는 밝기를 0으로(들어올리면 복구)
+    private var savedBrightness: CGFloat?
+    private func screenOff() {
+        if savedBrightness == nil { savedBrightness = UIScreen.main.brightness }
+        UIScreen.main.brightness = 0
+    }
+    private func screenOn() {
+        if let b = savedBrightness { UIScreen.main.brightness = b; savedBrightness = nil }
+    }
+
+    // MARK: 포그라운드에서만 기록
+    //  앱을 켜 둔 채 엎어둔 동안만 적립. 홈으로 나가거나 화면을 잠그면(백그라운드) 즉시 중단.
+    //  (face-down으로 화면이 꺼지는 건 백그라운드 전환이 아니라 계속 기록됨)
     private func enterBG() {
-        let wasCounting = (segStart != nil)
-        setCounting(false)
-        d.set(wasCounting, forKey: "study.bgCounting")
-        d.set(Date().timeIntervalSince1970, forKey: "study.bgAt")
-        if running { save() }   // 잠금/종료 대비 저장
+        setCounting(false)          // 진행 중 세그먼트를 여기까지만 적립하고 멈춤
+        stopTicker()                // 백그라운드 → 타이머 정지(배터리)
+        if running { save() }       // 잠금/종료 대비 저장 — 백그라운드 시간은 적립하지 않음
     }
     private func enterFG() {
         guard running else { return }
-        if d.bool(forKey: "study.bgCounting"), let t = d.object(forKey: "study.bgAt") as? Double {
-            base += max(0, Int(Date().timeIntervalSince1970 - t))
-            d.set(base, forKey: "study.\(ymd)")
-        }
-        d.set(false, forKey: "study.bgCounting")
-        near = UIDevice.current.proximityState
-        evaluate()
+        near = hasProximity ? UIDevice.current.proximityState : true
+        startTicker()               // 복귀 → UI 갱신 재개(곧 덮이면 setCounting이 다시 멈춤)
+        evaluate()                  // 복귀 후 다시 엎어둔 상태면 그때부터 재개
     }
 
     // MARK: Supabase 저장 (오늘 총합 upsert)

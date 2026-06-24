@@ -1,15 +1,15 @@
 import SwiftUI
 import PhotosUI
+import Supabase
 
 // ─────────────────────────────────────────────────────────────
-//  FeedbackView.swift — Beta 피드백 (하단 슬라이드) + 전송 서비스
+//  FeedbackView.swift — 피드백 (하단 슬라이드) + 전송 서비스
 //  · 회신 이메일 + 내용 + 사진 첨부
 //  · Supabase Edge Function(send-feedback) → Resend로 자동 발송
-//    feedback@daesuneung.com → support-beta@daesuneung.com
 //  · 메일 하단에 "답장 받을 이메일"이 더해져 발송됨(함수에서 처리)
 // ─────────────────────────────────────────────────────────────
 
-// 사용자 코드(기기 영속) — 회원가입 시 서버 배정으로 교체 가능
+// 로컬 폴백 코드(게스트/오프라인 시) — 서버 코드가 우선
 enum UserCode {
     static var current: String {
         let key = "fromise.userCode"
@@ -22,7 +22,7 @@ enum UserCode {
 }
 
 enum TicketCode {
-    /// 예: 20260620 + 사용자코드 + a
+    /// 폴백 티켓: yyyyMMdd + 로컬코드 + a (서버 연결 실패 시에만 사용)
     static func make(suffix: String = "a") -> String {
         let f = DateFormatter(); f.dateFormat = "yyyyMMdd"
         f.locale = Locale(identifier: "en_US_POSIX")
@@ -30,38 +30,71 @@ enum TicketCode {
     }
 }
 
-enum FeedbackService {
-    static let endpoint = "https://qrzzhabqwqyluzisrewl.supabase.co/functions/v1/send-feedback"
-    static let anonKey  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFyenpoYWJxd3F5bHV6aXNyZXdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDYyNjksImV4cCI6MjA5NjE4MjI2OX0.maOa6mMBxrRzvhX1475OwmLwwxyi4uiaCPx-_-c9d1Y"
+enum TicketService {
+    static let base    = "https://qrzzhabqwqyluzisrewl.supabase.co/functions/v1/"
+    static let anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFyenpoYWJxd3F5bHV6aXNyZXdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDYyNjksImV4cCI6MjA5NjE4MjI2OX0.maOa6mMBxrRzvhX1475OwmLwwxyi4uiaCPx-_-c9d1Y"
 
-    static func send(replyEmail: String, message: String, imageBase64: String?, ticket: String) async -> Bool {
-        guard let url = URL(string: endpoint) else { return false }
+    /// 로그인 시 사용자 토큰, 아니면 anon
+    static func authHeader() async -> String {
+        let token = try? await supabase.auth.session.accessToken
+        return "Bearer \(token ?? anonKey)"
+    }
+
+    /// 서버에서 티켓 발급 (실패 시 로컬 폴백)
+    static func next(kind: String) async -> String {
+        guard let url = URL(string: base + "new-ticket") else { return TicketCode.make() }
+        var req = URLRequest(url: url); req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(await authHeader(), forHTTPHeaderField: "Authorization")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["kind": kind])
+        guard let (data, resp) = try? await URLSession.shared.data(for: req),
+              (resp as? HTTPURLResponse)?.statusCode == 200,
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let t = obj["ticket"] as? String else { return TicketCode.make() }
+        return t
+    }
+}
+
+enum FeedbackService {
+    /// nil = 성공, 그 외 = 실패 사유(화면에 표시)
+    static func send(replyEmail: String, message: String, imageBase64: String?) async -> String? {
+        guard let url = URL(string: TicketService.base + "send-feedback") else { return "주소 오류" }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
+        req.setValue(await TicketService.authHeader(), forHTTPHeaderField: "Authorization")
         let body: [String: Any] = [
             "replyEmail": replyEmail,
             "message": message,
-            "ticket": ticket,
             "image": imageBase64 ?? ""
         ]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
         do {
-            let (_, resp) = try await URLSession.shared.data(for: req)
-            return (resp as? HTTPURLResponse)?.statusCode == 200
-        } catch { return false }
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? -1
+            if code == 200 { return nil }
+            let detail = String(data: data, encoding: .utf8) ?? ""
+            return "[\(code)] \(detail.prefix(300))"
+        } catch {
+            return "네트워크: \(error.localizedDescription)"
+        }
     }
 }
 
 struct FeedbackSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var email = ""
+    let defaultEmail: String
+    @State private var email: String
     @State private var message = ""
     @State private var photoItem: PhotosPickerItem?
     @State private var imageData: Data?
     @State private var busy = false
     @State private var err = ""
+
+    init(defaultEmail: String = "") {
+        self.defaultEmail = defaultEmail
+        _email = State(initialValue: defaultEmail)
+    }
 
     private var valid: Bool {
         email.contains("@") && email.contains(".") &&
@@ -142,13 +175,13 @@ struct FeedbackSheet: View {
                 .padding(18)
             }
             .background(Theme.paper.ignoresSafeArea())
-            .navigationTitle("Beta 피드백")
+            .navigationTitle("Fromise 피드백")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("닫기") { dismiss() } } }
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .onChange(of: photoItem) { item in
+        .onChange(of: photoItem) { _, item in
             guard let item else { return }
             Task { if let d = try? await item.loadTransferable(type: Data.self) { imageData = d } }
         }
@@ -161,11 +194,10 @@ struct FeedbackSheet: View {
     private func submit() {
         busy = true; err = ""
         let b64 = imageData?.base64EncodedString()
-        let ticket = TicketCode.make()
         Task {
-            let ok = await FeedbackService.send(replyEmail: email, message: message, imageBase64: b64, ticket: ticket)
+            let problem = await FeedbackService.send(replyEmail: email, message: message, imageBase64: b64)
             busy = false
-            if ok { dismiss() } else { err = "전송에 실패했어요. 잠시 후 다시 시도해 주세요." }
+            if let problem { err = problem } else { dismiss() }
         }
     }
 }

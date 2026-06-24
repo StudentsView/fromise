@@ -1,16 +1,15 @@
 import SwiftUI
 
 // ─────────────────────────────────────────────────────────────
-//  AccountView.swift — 계정 관리 (비밀번호 변경 · 회원탈퇴)
+//  AccountView.swift — 계정 관리 (비밀번호 변경 · 로그아웃 · 작별하기)
 //  설정 ▸ 이메일 행(>)에서 진입.
 // ─────────────────────────────────────────────────────────────
 
 struct AccountView: View {
     @EnvironmentObject var auth: AuthStore
     @State private var showPw = false
-    @State private var confirmDelete = false
-    @State private var deleting = false
-    @State private var deleteErr = ""
+    @State private var confirmOut = false
+    @State private var showDelete = false
 
     var body: some View {
         ScrollView {
@@ -42,33 +41,31 @@ struct AccountView: View {
                 }
                 .buttonStyle(.plain)
 
-                if !deleteErr.isEmpty {
-                    Text(deleteErr).font(.system(size: 12.5, weight: .semibold))
-                        .foregroundStyle(Theme.danger).frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                // 회원탈퇴
-                Button { confirmDelete = true } label: {
+                // 로그아웃
+                Button { confirmOut = true } label: {
                     HStack(spacing: 8) {
-                        if deleting { ProgressView().tint(Theme.danger) }
-                        else {
-                            Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 13, weight: .semibold))
-                            Text("회원탈퇴").font(.system(size: 15, weight: .heavy))
-                        }
+                        Image(systemName: "rectangle.portrait.and.arrow.right").font(.system(size: 14, weight: .semibold))
+                        Text("로그아웃").font(.system(size: 15, weight: .heavy))
                     }
-                    .foregroundStyle(Theme.danger)
+                    .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity).padding(.vertical, 15)
                     .background(Theme.card)
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.danger.opacity(0.45), lineWidth: 1))
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.line, lineWidth: 1))
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .disabled(deleting)
-                .padding(.top, 6)
 
-                Text("탈퇴하면 모든 학습 기록과 플래너가 영구 삭제되며 되돌릴 수 없어요.")
-                    .font(.system(size: 11.5, weight: .semibold)).foregroundStyle(Theme.ink3)
-                    .multilineTextAlignment(.center).padding(.horizontal, 8)
+                // 작별하기 ("작별"만 탈퇴 트리거 · 부드러운 톤)
+                HStack(spacing: 0) {
+                    Text("Fromise와 ").font(.system(size: 11.5, weight: .semibold)).foregroundStyle(Theme.ink3)
+                    Button { showDelete = true } label: {
+                        Text("작별").font(.system(size: 11.5, weight: .heavy)).foregroundStyle(Theme.ink2).underline()
+                    }
+                    .buttonStyle(.plain)
+                    Text("하기").font(.system(size: 11.5, weight: .semibold)).foregroundStyle(Theme.ink3)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 14)
             }
             .padding(18)
         }
@@ -76,17 +73,105 @@ struct AccountView: View {
         .navigationTitle("계정 관리")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showPw) { PasswordChangeSheet() }
-        .alert("정말 탈퇴할까요?", isPresented: $confirmDelete) {
+        .sheet(isPresented: $showDelete) { DeleteAccountSheet() }
+        .alert("로그아웃 할까요?", isPresented: $confirmOut) {
             Button("취소", role: .cancel) {}
-            Button("탈퇴", role: .destructive) {
-                deleting = true; deleteErr = ""
-                Task {
-                    if let e = await auth.deleteAccount() { deleteErr = e }
-                    deleting = false
-                }
-            }
+            Button("로그아웃", role: .destructive) { Task { await auth.signOut() } }
         } message: {
-            Text("모든 학습 기록과 플래너가 영구 삭제되며 되돌릴 수 없어요.")
+            Text("다시 로그인하면 정보가 그대로 복원돼요.")
+        }
+    }
+}
+
+// MARK: - 작별하기(회원탈퇴) 시트 — 하단 80% 슬라이드
+struct DeleteAccountSheet: View {
+    @EnvironmentObject var auth: AuthStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var pw = ""
+    @State private var confirmText = ""
+    @State private var busy = false
+    @State private var err = ""
+
+    private let phrase = "Good Bye, Fromise"
+    private var canDelete: Bool { !pw.isEmpty && confirmText == phrase }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    // 경고 (상단)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                            Text("정말 작별하시겠어요?")
+                        }
+                        .font(.system(size: 17, weight: .heavy)).foregroundStyle(Theme.danger)
+                        Text("탈퇴하면 모든 학습 기록과 플래너가 영구 삭제되며, 계정과 데이터는 다시 복구할 수 없어요.")
+                            .font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.ink2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Theme.danger.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                    // 비밀번호
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("현재 비밀번호").font(.system(size: 12, weight: .heavy)).foregroundStyle(Theme.ink3)
+                        SecureField("비밀번호", text: $pw)
+                            .font(.system(size: 15, weight: .semibold)).autocorrectionDisabled()
+                            .padding(13).background(Theme.card)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.line, lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+
+                    // 확인 문구
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("확인 문구").font(.system(size: 12, weight: .heavy)).foregroundStyle(Theme.ink3)
+                        Text("아래 칸에 \(phrase) 를 그대로 입력해 주세요.")
+                            .font(.system(size: 12.5, weight: .semibold)).foregroundStyle(Theme.ink2)
+                        TextField(phrase, text: $confirmText)
+                            .font(.system(size: 15, weight: .semibold)).autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                            .padding(13).background(Theme.card)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(confirmText == phrase ? Theme.good : Theme.line, lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+
+                    if !err.isEmpty {
+                        Text(err).font(.system(size: 12.5, weight: .semibold)).foregroundStyle(Theme.danger)
+                    }
+                }
+                .padding(22)
+            }
+
+            // 하단 고정 확인 버튼
+            Button(action: delete) {
+                Group {
+                    if busy { ProgressView().tint(.white) }
+                    else { Text("탈퇴하기").font(.system(size: 16, weight: .heavy)) }
+                }
+                .foregroundStyle(.white).frame(maxWidth: .infinity).padding(.vertical, 16)
+                .background(canDelete ? Theme.danger : Theme.danger.opacity(0.35))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(!canDelete || busy)
+            .padding(.horizontal, 22).padding(.bottom, 18)
+        }
+        .background(Theme.paper.ignoresSafeArea())
+        .presentationDetents([.fraction(0.8)])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func delete() {
+        busy = true; err = ""
+        Task {
+            let ok = await auth.verifyPassword(pw)
+            if !ok { err = "비밀번호가 올바르지 않아요."; busy = false; return }
+            if let e = await auth.deleteAccount() { err = e; busy = false; return }
+            // 성공 → auth.phase = .signedOut → RootFlow가 최초 화면으로 전환
+            dismiss()
         }
     }
 }
@@ -110,7 +195,7 @@ struct PasswordChangeSheet: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 14) {
                 Text("새 비밀번호").font(.system(size: 20, weight: .heavy)).foregroundStyle(Theme.ink)
-                Text("대문자·숫자·특수문자 포함 8자 이상")
+                Text("대문자, 숫자, 특수문자 포함 8자 이상")
                     .font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.ink2)
 
                 field("새 비밀번호", $pw)
