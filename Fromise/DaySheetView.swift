@@ -27,10 +27,36 @@ struct DaySheetView: View {
     @State private var ttDragErase = false
     @State private var penOnly = false   // 손가락 그리기 기본 허용 (iPhone은 항상 false)
     @State private var clearToken = 0     // 전체 지우기 강제 동기화용
+    @State private var showClearAlert = false
+    // 도구별 두께 단계(0=얇게,1=보통,2=굵게) — 도구 전환 시 각자 기억
+    @State private var penLevel = 1
+    @State private var hlLevel = 1
+    @State private var eraserLevel = 1
+
+    private let penWidths:    [CGFloat] = [2, 4, 7]
+    private let hlWidths:     [CGFloat] = [12, 20, 30]
+    private let eraserWidths: [CGFloat] = [15, 30, 55]
 
     private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
     private var day: Binding<DayData> { store.binding(key) }
     private var activeColor: Color { drawTool == .highlighter ? Color(hex: hlHex) : Color(hex: 0x222222) }
+    private var activePKTool: PKTool {
+        pkTool(for: drawTool, color: activeColor,
+               penWidth: penWidths[penLevel], hlWidth: hlWidths[hlLevel],
+               eraserWidth: eraserWidths[eraserLevel])
+    }
+    private var thicknessLevel: Int {
+        switch drawTool { case .pen: return penLevel; case .highlighter: return hlLevel; case .eraser: return eraserLevel }
+    }
+    private var thicknessBinding: Binding<Int> {
+        Binding(get: { thicknessLevel }, set: { v in
+            switch drawTool { case .pen: penLevel = v; case .highlighter: hlLevel = v; case .eraser: eraserLevel = v }
+        })
+    }
+    private func clearDrawing() {
+        day.wrappedValue.drawing = PKDrawing()
+        clearToken &+= 1            // 캔버스 강제 비우기
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -41,7 +67,7 @@ struct DaySheetView: View {
                         .background(GeometryReader { g in Color.clear.preference(key: HeightKey.self, value: g.size.height) })
                         .allowsHitTesting(mode == .type)
                     PencilCanvas(drawing: day.drawing, isDrawing: $isDrawing,
-                                 tool: pkTool(for: drawTool, color: activeColor),
+                                 tool: activePKTool,
                                  isActive: mode == .draw, penOnly: isPad && penOnly,
                                  clearToken: clearToken)
                         .frame(height: max(contentH, 1))
@@ -53,6 +79,12 @@ struct DaySheetView: View {
         }
         .background(Theme.paper.ignoresSafeArea())
         .navigationTitle(titleText).navigationBarTitleDisplayMode(.inline)
+        .alert("그림을 모두 지울까요?", isPresented: $showClearAlert) {
+            Button("취소", role: .cancel) {}
+            Button("지우기", role: .destructive) { clearDrawing() }
+        } message: {
+            Text("이 날짜에 그린 그림이 모두 삭제돼요.")
+        }
     }
 
     // MARK: 상단 도구막대
@@ -66,8 +98,8 @@ struct DaySheetView: View {
 
             if mode == .draw {
                 HStack(spacing: 8) {
-                    toolBtn(.pen, .pen); toolBtn(.highlighter, .highlighter); toolBtn(.eraser, .eraser)
-                    if drawTool == .highlighter { swatchRow(22) }
+                    toolBtn(.pen, .pen); highlighterBtn; toolBtn(.eraser, .eraser)
+                    thicknessMenu
                     Spacer()
                     if isPad {
                         Button { penOnly.toggle() } label: {
@@ -80,10 +112,7 @@ struct DaySheetView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         }
                     }
-                    Button {
-                        day.wrappedValue.drawing = PKDrawing()
-                        clearToken &+= 1            // 캔버스 강제 비우기
-                    } label: {
+                    Button { showClearAlert = true } label: {
                         Text("전체 지우기").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.danger)
                     }
                 }
@@ -98,6 +127,45 @@ struct DaySheetView: View {
             Icon(icon, size: 16).foregroundStyle(drawTool == t ? .white : Theme.ink)
                 .frame(width: 36, height: 30)
                 .background(drawTool == t ? Theme.ink : .clear)
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        }
+    }
+    // 형광펜: 한 번 탭=선택, 선택된 상태에서 다시 탭=색 팔레트 드롭다운.
+    // 아이콘 색은 현재 선택된 형광펜 색으로 표시.
+    @ViewBuilder
+    private var highlighterBtn: some View {
+        let selected = drawTool == .highlighter
+        let icon = Icon(.highlighter, size: 16)
+            .foregroundStyle(selected ? Color(hex: hlHex) : Theme.ink)   // 미선택 시 검정 유지(가독성)
+            .frame(width: 36, height: 30)
+            .background(selected ? Theme.ink : .clear)
+            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        if selected {
+            Menu {
+                Picker("형광펜 색", selection: $hlHex) {
+                    ForEach(Array(HL_HEX.enumerated()), id: \.offset) { i, hex in
+                        Text(HL_NAMES[i]).tag(hex)
+                    }
+                }
+            } label: { icon }
+        } else {
+            Button { drawTool = .highlighter } label: { icon }
+        }
+    }
+    // 두께 점 버튼 → 탭하면 두께 3단계 드롭다운 (현재 도구에 적용)
+    private var thicknessMenu: some View {
+        Menu {
+            Picker("두께", selection: thicknessBinding) {
+                Text("얇게").tag(0)
+                Text("보통").tag(1)
+                Text("굵게").tag(2)
+            }
+        } label: {
+            Circle().fill(Theme.ink)
+                .frame(width: CGFloat(5 + thicknessLevel * 4), height: CGFloat(5 + thicknessLevel * 4))
+                .frame(width: 36, height: 30)
+                .contentShape(Rectangle())
+                .overlay(RoundedRectangle(cornerRadius: 9).stroke(Theme.line, lineWidth: 1))
                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         }
     }
@@ -131,10 +199,11 @@ struct DaySheetView: View {
             ProgressRing(percent: pct)
             VStack(alignment: .leading, spacing: 10) {
                 Text("오늘 달성률").font(.system(size: 14, weight: .heavy)).foregroundStyle(Theme.ink)
-                HStack(spacing: 18) {
+                HStack(spacing: 12) {
                     timeField("목표", get: { store.day(key).goalMinutes }, set: { day.wrappedValue.goalMinutes = $0 })
                     netDisplay
                 }
+                .fixedSize(horizontal: true, vertical: false)   // 목표/공부 가로 유지(세로 줄바꿈 방지)
             }
             Spacer(minLength: 0)
         }
@@ -157,7 +226,7 @@ struct DaySheetView: View {
         let hB = Binding<Int>(get: { mins / 60 }, set: { let t = $0 * 60 + mins % 60; set(t == 0 ? nil : t) })
         let mB = Binding<Int>(get: { mins % 60 }, set: { let t = mins / 60 * 60 + $0; set(t == 0 ? nil : t) })
         return HStack(spacing: 4) {
-            Text(name).font(.system(size: 11, weight: .heavy)).foregroundStyle(Theme.ink3)
+            Text(name).font(.system(size: 11, weight: .heavy)).foregroundStyle(Theme.ink3).lineLimit(1)
             numChip(hB); Text("h").font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.ink3)
             numChip(mB); Text("m").font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.ink3)
         }
@@ -165,7 +234,7 @@ struct DaySheetView: View {
     private func numChip(_ b: Binding<Int>) -> some View {
         TextField("0", value: b, format: .number)
             .keyboardType(.numberPad).multilineTextAlignment(.center)
-            .font(.system(size: 14, weight: .bold)).frame(width: 30).padding(.vertical, 4)
+            .font(.system(size: 14, weight: .bold)).frame(width: 26).padding(.vertical, 4)
             .background(Theme.paper).clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
     }
 

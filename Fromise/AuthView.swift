@@ -28,7 +28,9 @@ struct AuthView: View {
             logoBlock
             Spacer()
             Group {
-                if stage == .intro { startButton } else { formBlock }
+                if stage == .intro {
+                    VStack(spacing: 12) { startButton; browseButton }
+                } else { formBlock }
             }
             Spacer().frame(height: 36)
         }
@@ -103,6 +105,18 @@ struct AuthView: View {
                 .frame(maxWidth: .infinity).padding(.vertical, 17)
                 .background(Theme.ink).clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
+        .opacity(ready ? 1 : 0).offset(y: ready ? 0 : 14)
+    }
+
+    // 로그인 없이 둘러보기 (Apple 심사: 비로그인 탐색 허용)
+    private var browseButton: some View {
+        Button { auth.browseAsGuest() } label: {
+            Text("로그인 없이 둘러보기")
+                .font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.ink2)
+                .frame(maxWidth: .infinity).padding(.vertical, 15)
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.line, lineWidth: 1.2))
+        }
+        .buttonStyle(.plain)
         .opacity(ready ? 1 : 0).offset(y: ready ? 0 : 14)
     }
 

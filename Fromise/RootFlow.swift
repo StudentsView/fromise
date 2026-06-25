@@ -15,7 +15,11 @@ struct RootFlow: View {
         ZStack {
             switch auth.phase {
             case .signedOut:
-                AuthView().transition(.opacity)
+                if auth.guest {
+                    RootTabView(guest: true).transition(.opacity)   // 비로그인 둘러보기
+                } else {
+                    AuthView().transition(.opacity)
+                }
             case .verifying:
                 VerifyView().transition(.opacity)
             case .signedIn:
@@ -27,6 +31,7 @@ struct RootFlow: View {
             }
         }
         .animation(.easeInOut(duration: 0.45), value: auth.phase)
+        .animation(.easeInOut(duration: 0.45), value: auth.guest)
         .animation(.easeInOut(duration: 0.45), value: profile.onboarded)
         .onAppear { if auth.phase == .signedIn { onSignedIn() } }
         .onChange(of: auth.phase) { _, phase in

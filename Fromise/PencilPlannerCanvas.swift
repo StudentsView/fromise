@@ -10,13 +10,15 @@ import PencilKit
 enum PlannerMode { case type, draw }
 enum DrawTool   { case pen, highlighter, eraser }
 
-/// DrawTool → PencilKit 도구 변환
+/// DrawTool → PencilKit 도구 변환 (펜·형광펜·지우개 두께 지원)
 func pkTool(for tool: DrawTool, color: Color,
-            penWidth: CGFloat = 3, hlWidth: CGFloat = 18) -> PKTool {
+            penWidth: CGFloat = 3, hlWidth: CGFloat = 18, eraserWidth: CGFloat = 30) -> PKTool {
     switch tool {
     case .pen:         return PKInkingTool(.pen,    color: UIColor(color), width: penWidth)
     case .highlighter: return PKInkingTool(.marker, color: UIColor(color), width: hlWidth)
-    case .eraser:      return PKEraserTool(.bitmap)
+    case .eraser:
+        if #available(iOS 16.4, *) { return PKEraserTool(.bitmap, width: eraserWidth) }
+        else { return PKEraserTool(.bitmap) }
     }
 }
 

@@ -6,6 +6,7 @@ import SwiftUI
 // ─────────────────────────────────────────────────────────────
 
 struct HomeView: View {
+    var guest: Bool = false
     var onOpen: (RootTabView.Tab) -> Void = { _ in }
 
     @EnvironmentObject var profile: ProfileStore
@@ -46,13 +47,13 @@ struct HomeView: View {
     }
 
     private var header: some View {
-        Button { showNick = true } label: {
+        Button { if !guest { showNick = true } } label: {   // 게스트는 닉네임 편집 차단(프로필 우회 방지)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 0) {
                     Text("오늘도 한 장, ").foregroundStyle(Theme.ink2)
                     Text(profile.displayName).foregroundStyle(Theme.ink).bold()
                     Text("님").foregroundStyle(Theme.ink2)
-                    Icon(.pen, size: 11).foregroundStyle(Theme.ink3).padding(.leading, 5)
+                    if !guest { Icon(.pen, size: 11).foregroundStyle(Theme.ink3).padding(.leading, 5) }
                 }
                 .font(.system(size: 15, weight: .semibold))
                 HStack(alignment: .firstTextBaseline, spacing: 10) {

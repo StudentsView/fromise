@@ -17,10 +17,92 @@ final class AuthStore: ObservableObject {
     @Published var errorMessage = ""
     @Published var busy = false
     @Published var pendingEmail = ""
+    @Published var email = ""              // 화면 표시용 — 항상 최신 세션의 이메일
+    @Published var guest = false           // 비로그인 '둘러보기' 모드
     private var pendingPassword = ""
+    private var authTask: Task<Void, Never>?
+    private let versionKey = "fromise_last_build_version"
 
     init() {
-        if supabase.auth.currentSession != nil { phase = .signedIn }
+        // 동기적으로 즉시 알 수 있는 값 먼저 채움(깜빡임 방지)
+        if let s = supabase.auth.currentSession {
+            phase = .signedIn
+            email = s.user.email ?? ""
+        }
+        observeAuthState()
+        Task { await bootstrap() }
+    }
+
+    deinit { authTask?.cancel() }
+
+    // 앱 시작 시: 업데이트면 재인증, 아니면 일반 세션 복원
+    private func bootstrap() async {
+        if consumeVersionChange() {
+            await reauthenticateAfterUpdate()
+        } else {
+            await restoreSession()
+        }
+    }
+
+    /// 저장된 세션을 비동기로 정확히 복원(만료 시 자동 토큰 갱신).
+    /// 앱 업데이트 직후 currentUser가 아직 메모리에 올라오지 않아
+    /// 이메일이 '—'로 보이던 문제를 해결.
+    func restoreSession() async {
+        do {
+            let session = try await supabase.auth.session   // 만료 시 자동 refresh
+            email = session.user.email ?? email
+            phase = .signedIn
+        } catch {
+            // 세션이 없거나 갱신 실패 → 깨끗하게 로그아웃 상태로
+            if phase == .signedIn { await signOut() } else { phase = .signedOut }
+        }
+    }
+
+    /// 업데이트 직후: 저장된 세션의 토큰을 강제 갱신해 사용자 정보를 새로 받아옴.
+    /// 갱신이 안 되면 자동 로그아웃하여 재로그인을 유도.
+    private func reauthenticateAfterUpdate() async {
+        guard supabase.auth.currentSession != nil else { phase = .signedOut; return }
+        do {
+            let session = try await supabase.auth.refreshSession()
+            email = session.user.email ?? ""
+            phase = .signedIn
+            if email.isEmpty { await signOut() }   // 그래도 비면 깨끗이 로그아웃
+        } catch {
+            await signOut()
+        }
+    }
+
+    /// 빌드 버전이 바뀌었는지(=업데이트) 확인하고 기록. 최초 설치는 false.
+    private func consumeVersionChange() -> Bool {
+        let info = Bundle.main.infoDictionary
+        let v = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let b = info?["CFBundleVersion"] as? String ?? "?"
+        let tag = "\(v)(\(b))"
+        let last = UserDefaults.standard.string(forKey: versionKey)
+        UserDefaults.standard.set(tag, forKey: versionKey)
+        return last != nil && last != tag   // 이전 기록이 있고 달라졌을 때만 = 업데이트
+    }
+
+    // 세션 변화를 구독해 이메일/단계를 항상 동기화
+    private func observeAuthState() {
+        authTask = Task { [weak self] in
+            for await change in supabase.auth.authStateChanges {
+                guard let self else { return }
+                switch change.event {
+                case .initialSession, .signedIn, .tokenRefreshed, .userUpdated:
+                    if let s = change.session {
+                        self.email = s.user.email ?? self.email
+                        self.guest = false
+                        self.phase = .signedIn
+                    }
+                case .signedOut:
+                    self.email = ""
+                    self.phase = .signedOut
+                default:
+                    break
+                }
+            }
+        }
     }
 
     // 회원가입 → 이메일 인증 대기
@@ -28,7 +110,7 @@ final class AuthStore: ObservableObject {
         busy = true; errorMessage = ""
         do {
             let res = try await supabase.auth.signUp(email: email, password: password)
-            pendingEmail = email; pendingPassword = password
+            pendingEmail = email; pendingPassword = password; self.email = email
             phase = (res.session != nil) ? .signedIn : .verifying
         } catch { errorMessage = friendly(error) }
         busy = false
@@ -51,6 +133,7 @@ final class AuthStore: ObservableObject {
         busy = true; errorMessage = ""
         do {
             _ = try await supabase.auth.signIn(email: email, password: password)
+            self.email = email
             phase = .signedIn
         } catch { errorMessage = friendly(error) }
         busy = false
@@ -58,9 +141,15 @@ final class AuthStore: ObservableObject {
 
     func signOut() async {
         try? await supabase.auth.signOut()
-        pendingEmail = ""; pendingPassword = ""; errorMessage = ""
+        pendingEmail = ""; pendingPassword = ""; errorMessage = ""; email = ""
         phase = .signedOut
     }
+
+    // 비로그인 둘러보기 시작 (로그인 화면 대신 앱을 미리 탐색)
+    func browseAsGuest() { guest = true }
+
+    // 둘러보기 종료 → 로그인/회원가입 첫 화면으로 복귀
+    func exitGuest() { guest = false; errorMessage = "" }
 
     // 닉네임·생년월일·목표일을 계정 메타데이터에 저장
     func saveProfile(nickname: String, birth: Date, exam: Date) async {
@@ -98,9 +187,6 @@ final class AuthStore: ObservableObject {
         } catch { return false }
     }
 
-    // 현재 로그인한 계정 이메일
-    var email: String { supabase.auth.currentUser?.email ?? pendingEmail }
-
     // 계정 메타데이터에서 닉네임/생년월일/목표일 읽기
     func currentMeta() -> (nickname: String?, birth: Date?, exam: Date?) {
         guard let md = supabase.auth.currentUser?.userMetadata else { return (nil, nil, nil) }
@@ -133,6 +219,7 @@ final class AuthStore: ObservableObject {
                 return "탈퇴 처리에 실패했어요. 잠시 후 다시 시도해 주세요."
             }
             try? await supabase.auth.signOut()
+            email = ""
             phase = .signedOut
             return nil
         } catch {
