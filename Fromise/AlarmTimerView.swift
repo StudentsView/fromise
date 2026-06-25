@@ -149,7 +149,7 @@ struct AlarmTimerView: View {
                 }
             }
 
-            Text("설정한 알람은 앱을 닫거나 잠가도 울려요. (백그라운드에선 약 5분간 5초 간격)")
+            Text("이어폰을 연결하면 주변을 방해하지 않아요.")
                 .font(.system(size: 11.5, weight: .semibold)).foregroundStyle(Theme.ink3)
                 .multilineTextAlignment(.center).padding(.top, 4)
         }

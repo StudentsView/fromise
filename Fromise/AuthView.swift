@@ -63,7 +63,7 @@ struct AuthView: View {
             }
             
             // 3. ver 라벨
-            Text("Ver 0.1.17")
+            Text("Powered by 대수능.com")
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(Theme.ink3)
                 .opacity(ready ? 1 : 0)

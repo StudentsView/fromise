@@ -8,12 +8,22 @@ import UIKit
 // ─────────────────────────────────────────────────────────────
 //  AlarmManager — 알람/타이머 핵심
 //
-//  iOS 제약상 "종료/잠금 상태에서 정확한 시각에 소리"는 로컬 알림만 가능.
-//  · 포그라운드: AVAudioPlayer로 mp3 무한 반복 (종료 누를 때까지)
-//  · 백그라운드/잠금/종료: 알림을 5초 간격으로 미리 60개 예약
-//      → 약 5분간 5초마다 울림 (iOS 대기 알림 64개 한도). 앱 열면 즉시 취소.
-//  · 알림음은 caf/wav/aiff(≤30초)만 됨 → 잠금화면용 alarm1.caf … 필요
-//    (인앱 재생은 1.mp3 … 그대로 사용)
+//  방해금지(집중)모드 + 무음 + 잠금 상태에서도 울리게 하는 3중 방어:
+//
+//  1) 백그라운드 오디오 keep-alive (핵심 — "꼬끼오 알람" 방식)
+//     · 알람 예약 시점부터 안 들리는 무음 오디오를 .playback 으로 무한 재생해
+//       앱을 백그라운드에서 살려둔다. .playback 은 무음 스위치를 무시하고,
+//       실제 오디오 재생이라 방해금지모드와도 무관 → 무음+DND 둘 다 뚫림.
+//     · 백그라운드에서 앱이 깨어 있으므로 타이머로 정확한 시각에 실제 알람음으로 전환.
+//     · 한계: 앱을 완전히 강제 종료(스와이프로 닫음)하면 동작 안 함(모든 알람앱 공통).
+//
+//  2) Critical Alerts(긴급 경고) 로컬 알림 — Apple 승인 시 활성
+//     · interruptionLevel=.critical + criticalSoundNamed 로 DND·무음·강제종료를 모두 뚫음.
+//     · 엔타이틀먼트 승인 전에는 일반 알림으로 자동 폴백된다.
+//
+//  3) 일반 로컬 알림 백업 — 5초 간격 60개(약 5분). 강제종료 대비. (DND/무음엔 막힐 수 있음)
+//
+//  · 인앱/keep-alive 재생은 1.mp3 …, 잠금화면 알림음은 caf(≤30초) alarm1.caf … 사용.
 // ─────────────────────────────────────────────────────────────
 
 struct AlarmRecord: Codable, Identifiable {
@@ -37,6 +47,8 @@ final class AlarmManager: NSObject, ObservableObject {
     private let center = UNUserNotificationCenter.current()
     private var player: AVAudioPlayer?
     private var previewPlayer: AVAudioPlayer?
+    private var keepAlivePlayer: AVAudioPlayer?   // 백그라운드 생존용 무음 오디오 (예약~울림 동안 재생)
+    private var fireTimer: Timer?                  // 백그라운드에서 정확한 시각에 실제 알람음으로 전환
     private var ringingSoundName: String?     // 현재 울리는 중인 사운드 이름 (인터럽션 후 재생 복구용)
     private var fadeTimer: Timer?
     private let fadeDuration: TimeInterval = 15   // 이 시간(초)에 걸쳐 0 → 최대 볼륨으로 점점 커짐
@@ -64,6 +76,7 @@ final class AlarmManager: NSObject, ObservableObject {
 
     func configure() {
         center.delegate = self
+        // Critical Alerts 승인 후 옵션에 .criticalAlert 추가할 것.
         center.requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
         loadHistory()
         // 화면이 보이기 직전에 미리 울림 윈도우를 올림 (복귀 시 즉시 표시)
@@ -79,13 +92,18 @@ final class AlarmManager: NSObject, ObservableObject {
     }
 
     private func handleAudioInterruption(_ note: Notification) {
-        guard isRinging, let name = ringingSoundName,
-              let info = note.userInfo,
+        guard let info = note.userInfo,
               let typeRaw = info[AVAudioSessionInterruptionTypeKey] as? UInt,
               let type = AVAudioSession.InterruptionType(rawValue: typeRaw),
               type == .ended
         else { return }
-        playLoop(name, fadeIn: false)   // 인터럽션이 끝났는데도 계속 울리는 중이어야 하면 재생 재개 (페이드는 다시 하지 않음)
+        if isRinging, let name = ringingSoundName {
+            playLoop(name, fadeIn: false)   // 계속 울리는 중이어야 하면 재생 재개 (페이드는 다시 하지 않음)
+        } else if keepAlivePlayer != nil {
+            // 알람 대기 중 끊겼다 끝난 경우 → 무음 keep-alive 재개해 앱이 백그라운드에서 다시 살아나도록
+            try? AVAudioSession.sharedInstance().setActive(true)
+            keepAlivePlayer?.play()
+        }
     }
 
     // MARK: 예약
@@ -105,14 +123,71 @@ final class AlarmManager: NSObject, ObservableObject {
             let c = UNMutableNotificationContent()
             c.title = title; c.body = body; c.sound = snd
             c.userInfo = ["kind": kind.rawValue]
+            // Critical Alerts 승인 후: c.interruptionLevel = .critical (DND/무음 우회)
             let trig = UNTimeIntervalNotificationTrigger(timeInterval: t, repeats: false)
             center.add(UNNotificationRequest(identifier: "\(idPrefix)\(k)", content: c, trigger: trig))
         }
+
+        // 백그라운드/잠금에서도 무음·DND를 뚫고 울리도록: 예약 시점부터 무음 오디오로 앱을 살려두고,
+        // 정확한 시각에 실제 알람음으로 전환한다. (강제종료된 경우엔 위의 Critical 알림이 대비)
+        startKeepAlive()
+        scheduleFireTimer(at: fireDate, kind: kind, sound: sound, fadeIn: fadeIn)
     }
 
     private func notifSound(_ name: String) -> UNNotificationSound {
         // 잠금화면 알림음: alarm1.caf / alarm2.caf / alarm3.caf (번들 루트, ≤30초)
+        // Critical Alerts 승인 후: 아래를 criticalSoundNamed(_:withAudioVolume:) 로 바꾸면 무음/볼륨 무시하고 최대 음량 재생.
         UNNotificationSound(named: UNNotificationSoundName("alarm\(name).caf"))
+    }
+
+    // MARK: 백그라운드 keep-alive (무음 오디오로 앱 생존 → 무음·DND 우회)
+    /// 안 들리는 무음 오디오를 .playback 으로 무한 재생해 백그라운드/잠금에서도 앱이 죽지 않게 한다.
+    private func startKeepAlive() {
+        guard keepAlivePlayer == nil, let url = silentClipURL() else { return }
+        let s = AVAudioSession.sharedInstance()
+        // 알람 대기 동안은 다른 앱 오디오(음악 등)를 막지 않도록 mixWithOthers. 실제 울릴 땐 단독 재생으로 전환.
+        try? s.setCategory(.playback, options: [.mixWithOthers])
+        try? s.setActive(true)
+        keepAlivePlayer = try? AVAudioPlayer(contentsOf: url)
+        keepAlivePlayer?.numberOfLoops = -1
+        keepAlivePlayer?.volume = 0
+        keepAlivePlayer?.prepareToPlay()
+        keepAlivePlayer?.play()
+    }
+    private func stopKeepAlive() {
+        keepAlivePlayer?.stop()
+        keepAlivePlayer = nil
+        fireTimer?.invalidate(); fireTimer = nil
+    }
+    /// 백그라운드 오디오로 앱이 깨어 있는 동안, 알람 시각에 맞춰 실제 알람음으로 전환.
+    private func scheduleFireTimer(at fireDate: Date, kind: Kind, sound: String, fadeIn: Bool) {
+        fireTimer?.invalidate(); fireTimer = nil
+        let delay = fireDate.timeIntervalSinceNow
+        guard delay > 0 else { fireNow(kind: kind, sound: sound, fadeIn: fadeIn); return }
+        let t = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.fireNow(kind: kind, sound: sound, fadeIn: fadeIn) }
+        }
+        // 백그라운드에서도 RunLoop 가 돌도록 common 모드에 등록
+        RunLoop.main.add(t, forMode: .common)
+        fireTimer = t
+    }
+    /// 1초짜리 무음 WAV 를 임시 폴더에 한 번만 생성해 재사용(번들 리소스 추가 불필요).
+    private func silentClipURL() -> URL? {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("fromise.silence.wav")
+        if FileManager.default.fileExists(atPath: url.path) { return url }
+        let sampleRate = 8000, seconds = 1
+        let dataSize = sampleRate * seconds * 2   // 16-bit mono
+        var d = Data()
+        func put32(_ v: UInt32) { var x = v.littleEndian; withUnsafeBytes(of: &x) { d.append(contentsOf: $0) } }
+        func put16(_ v: UInt16) { var x = v.littleEndian; withUnsafeBytes(of: &x) { d.append(contentsOf: $0) } }
+        d.append(contentsOf: Array("RIFF".utf8)); put32(UInt32(36 + dataSize))
+        d.append(contentsOf: Array("WAVE".utf8))
+        d.append(contentsOf: Array("fmt ".utf8)); put32(16); put16(1); put16(1)
+        put32(UInt32(sampleRate)); put32(UInt32(sampleRate * 2)); put16(2); put16(16)
+        d.append(contentsOf: Array("data".utf8)); put32(UInt32(dataSize))
+        d.append(Data(count: dataSize))   // 전부 0 = 무음
+        try? d.write(to: url)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
     func cancelNotifications() {
@@ -120,6 +195,8 @@ final class AlarmManager: NSObject, ObservableObject {
         center.removePendingNotificationRequests(withIdentifiers: ids)
         center.removeDeliveredNotifications(withIdentifiers: ids)
         center.setBadgeCount(0)
+        // 알람 대기를 끝내는 모든 경로(정지 버튼·발화 직전·복귀)의 길목 → 무음 keep-alive와 발화 타이머도 정리.
+        stopKeepAlive()
     }
 
     /// 사용자가 "종료"
