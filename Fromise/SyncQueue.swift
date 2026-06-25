@@ -25,7 +25,7 @@ final class SyncQueue: ObservableObject {
     private init() {
         monitor.pathUpdateHandler = { [weak self] path in
             let ok = path.status == .satisfied
-            Task { @MainActor in self?.setOnline(ok) }
+            Task { @MainActor [weak self] in self?.setOnline(ok) }
         }
         monitor.start(queue: mq)
     }

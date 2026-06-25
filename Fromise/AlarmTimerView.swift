@@ -37,7 +37,7 @@ struct AlarmTimerView: View {
                         ForEach(Mode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    .onChange(of: mode) { _ in alarm.stopPreview() }   // 탭 전환 시 미리듣기 정지
+                    .onChange(of: mode) { alarm.stopPreview() }   // 탭 전환 시 미리듣기 정지
 
                     switch mode {
                     case .timer: timerSection
@@ -189,7 +189,7 @@ struct AlarmTimerView: View {
                 }
             }
             .toggleStyle(SwitchToggleStyle(tint: Theme.ink))
-            .onChange(of: fadeIn) { _ in alarm.stopPreview() }   // 토글 조작 시 미리듣기 정지
+            .onChange(of: fadeIn) { alarm.stopPreview() }   // 토글 조작 시 미리듣기 정지
             .padding(.horizontal, 14).padding(.vertical, 10)
             .background(Theme.card)
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.line, lineWidth: 1))
@@ -209,7 +209,7 @@ struct AlarmTimerView: View {
             .background(Theme.card)
             .overlay(RoundedRectangle(cornerRadius: 11).stroke(Theme.line, lineWidth: 1))
             .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-            .onChange(of: text.wrappedValue) { _ in alarm.stopPreview() }   // 입력창 조작 시 미리듣기 정지
+            .onChange(of: text.wrappedValue) { alarm.stopPreview() }   // 입력창 조작 시 미리듣기 정지
     }
     private func bigBtn(_ t: String, _ bg: Color) -> some View {
         Text(t).font(.system(size: 16, weight: .heavy)).foregroundStyle(Theme.paper)

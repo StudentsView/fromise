@@ -82,21 +82,20 @@ final class AlarmManager: NSObject, ObservableObject {
         // 화면이 보이기 직전에 미리 울림 윈도우를 올림 (복귀 시 즉시 표시)
         NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification,
                                                object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.appBecameActive() }
+            Task { @MainActor [weak self] in self?.appBecameActive() }
         }
         // 전화/다른 앱 소리 등으로 재생이 끊겼다가 끝나면, 울리는 중이었다면 다시 이어서 재생
         NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification,
                                                object: AVAudioSession.sharedInstance(), queue: .main) { [weak self] note in
-            Task { @MainActor in self?.handleAudioInterruption(note) }
+            // Notification(비Sendable)을 Task로 넘기지 않도록 인터럽션 종료 여부를 여기서 먼저 판별
+            guard let typeRaw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  AVAudioSession.InterruptionType(rawValue: typeRaw) == .ended
+            else { return }
+            Task { @MainActor [weak self] in self?.handleAudioInterruptionEnded() }
         }
     }
 
-    private func handleAudioInterruption(_ note: Notification) {
-        guard let info = note.userInfo,
-              let typeRaw = info[AVAudioSessionInterruptionTypeKey] as? UInt,
-              let type = AVAudioSession.InterruptionType(rawValue: typeRaw),
-              type == .ended
-        else { return }
+    private func handleAudioInterruptionEnded() {
         if isRinging, let name = ringingSoundName {
             playLoop(name, fadeIn: false)   // 계속 울리는 중이어야 하면 재생 재개 (페이드는 다시 하지 않음)
         } else if keepAlivePlayer != nil {
@@ -165,7 +164,7 @@ final class AlarmManager: NSObject, ObservableObject {
         let delay = fireDate.timeIntervalSinceNow
         guard delay > 0 else { fireNow(kind: kind, sound: sound, fadeIn: fadeIn); return }
         let t = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
-            Task { @MainActor in self?.fireNow(kind: kind, sound: sound, fadeIn: fadeIn) }
+            Task { @MainActor [weak self] in self?.fireNow(kind: kind, sound: sound, fadeIn: fadeIn) }
         }
         // 백그라운드에서도 RunLoop 가 돌도록 common 모드에 등록
         RunLoop.main.add(t, forMode: .common)
@@ -190,13 +189,15 @@ final class AlarmManager: NSObject, ObservableObject {
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
+    /// 예약/대기 중인 모든 것을 완전히 취소(정지 버튼·종료·새 예약 시).
+    /// ※ 발화 후 "울리는 중"에는 호출하지 않는다 — 호출하면 5초 간격 백업 알림까지 지워져 백그라운드 울림이 끊긴다.
     func cancelNotifications() {
         let ids = (0..<batchCount).map { "\(idPrefix)\($0)" }
         center.removePendingNotificationRequests(withIdentifiers: ids)
         center.removeDeliveredNotifications(withIdentifiers: ids)
         center.setBadgeCount(0)
-        // 알람 대기를 끝내는 모든 경로(정지 버튼·발화 직전·복귀)의 길목 → 무음 keep-alive와 발화 타이머도 정리.
         stopKeepAlive()
+        active = nil   // 더 이상 대기/활성 알람 없음 (정지 시 stale 상태로 남아 나중에 헛울리는 것 방지)
     }
 
     /// 사용자가 "종료"
@@ -210,20 +211,30 @@ final class AlarmManager: NSObject, ObservableObject {
         RingingWindow.shared.show(false, alarm: self)
     }
 
-    /// 즉시 울림(포그라운드에서 시간이 다 됐을 때)
+    /// 즉시 울림. 무음 keep-alive/발화 타이머만 정리하고, 5초 간격 백업 알림은 그대로 둔다.
+    /// → 앱이 백그라운드/잠금/강제종료 상태여도 알림이 5초마다 계속 울려 사용자를 깨운다(종료 버튼을 누를 때까지).
     func fireNow(kind: Kind, sound: String, fadeIn: Bool = true) {
         guard !isRinging else { return }
-        cancelNotifications()
+        stopKeepAlive()
         startRinging(kind: kind, sound: sound, fadeIn: fadeIn)
     }
 
-    /// 앱이 다시 활성화될 때 — 이미 울린 알람이 있으면 인앱 울림 + 나머지 알림 취소
+    /// 앱이 다시 활성화될 때 — 이미 울린 알람이 있으면 인앱 울림으로 인계.
+    /// ※ 백업 알림은 취소하지 않는다. 또 이미 울리는 중이면 소리를 절대 다시 시작하지 않는다
+    ///   (앱으로 돌아오기만 해도 소리가 꺼지거나 페이드가 처음부터 다시 시작되던 문제 방지 — 종료 버튼으로만 멈춤).
     func appBecameActive() {
-        guard let a = active else { return }
-        if Date() >= a.fireAt {
-            cancelNotifications()
-            startRinging(kind: Kind(rawValue: a.kind) ?? .timer, sound: a.sound, fadeIn: a.fadeIn)
+        guard let a = active, Date() >= a.fireAt else { return }
+        if isRinging {
+            RingingWindow.shared.show(true, alarm: self)   // 화면만 다시 보장
+            if player?.isPlaying != true, let name = ringingSoundName {
+                playLoop(name, fadeIn: false)              // 혹시 백그라운드에서 재생이 끊겼다면 이어서 재생
+            }
+            return
         }
+        // 알림으로만 울리고 있다가 처음 앱에 들어온 경우 → 인앱 울림으로 전환.
+        // 이미 울린 알람이라 페이드 없이 곧장 최대 음량으로(들어오자마자 작아지는 느낌 방지).
+        stopKeepAlive()
+        startRinging(kind: Kind(rawValue: a.kind) ?? .timer, sound: a.sound, fadeIn: false)
     }
 
     // MARK: 인앱 울림
@@ -258,19 +269,22 @@ final class AlarmManager: NSObject, ObservableObject {
         }
     }
     /// fadeStartVolume → 1.0 까지 fadeDuration에 걸쳐 선형으로 키움
+    private var fadeStep = 0
     private func startFade() {
         let steps = 30
         let interval = fadeDuration / Double(steps)
-        var step = 0
-        fadeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] timer in
-            Task { @MainActor in
-                guard let self, let p = self.player, self.isRinging else { timer.invalidate(); return }
-                step += 1
-                let progress = Double(step) / Double(steps)
+        fadeStep = 0
+        fadeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, let p = self.player, self.isRinging else {
+                    self?.fadeTimer?.invalidate(); self?.fadeTimer = nil; return
+                }
+                self.fadeStep += 1
+                let progress = Double(self.fadeStep) / Double(steps)
                 p.volume = Float(min(1, Double(self.fadeStartVolume) + progress * Double(1 - self.fadeStartVolume)))
-                if step >= steps {
+                if self.fadeStep >= steps {
                     p.volume = 1
-                    timer.invalidate()
+                    self.fadeTimer?.invalidate()
                     self.fadeTimer = nil
                 }
             }
