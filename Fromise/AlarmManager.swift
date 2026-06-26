@@ -5,6 +5,14 @@ import SwiftUI
 import Combine
 import UIKit
 
+// 볼륨 제어 메모:
+//  · iOS는 잠금/백그라운드에서 MPVolumeView 로 '기기(시스템) 볼륨'을 바꾸는 걸 막는다.
+//    그래서 0%→설정값 램프를 기기 볼륨으로 하려던 방식은 실제 기기에서 전혀 먹히지 않았다.
+//  · 그래서 알람앱 공통 방식대로 '재생기(AVAudioPlayer) 자체 볼륨'(player.volume, 0~1)을 조절한다.
+//    이건 앱 자신의 오디오라 잠금/백그라운드에서도 100% 동작한다.
+//    (들리는 크기 = player.volume × 기기 미디어 볼륨 → 설정값은 '재생 볼륨' 비율로 동작)
+//  · 잠금화면 알림음(caf)은 '벨소리' 볼륨이라 어차피 앱이 제어 불가(인앱 재생음만 제어됨).
+
 // ─────────────────────────────────────────────────────────────
 //  AlarmManager — 알람/타이머 핵심
 //
@@ -21,7 +29,7 @@ import UIKit
 //     · interruptionLevel=.critical + criticalSoundNamed 로 DND·무음·강제종료를 모두 뚫음.
 //     · 엔타이틀먼트 승인 전에는 일반 알림으로 자동 폴백된다.
 //
-//  3) 일반 로컬 알림 백업 — 5초 간격 60개(약 5분). 강제종료 대비. (DND/무음엔 막힐 수 있음)
+//  3) 일반 로컬 알림 백업 — 2초 간격 60개(약 2분). 강제종료 대비. (DND/무음엔 막힐 수 있음)
 //
 //  · 인앱/keep-alive 재생은 1.mp3 …, 잠금화면 알림음은 caf(≤30초) alarm1.caf … 사용.
 // ─────────────────────────────────────────────────────────────
@@ -50,15 +58,18 @@ final class AlarmManager: NSObject, ObservableObject {
     private var keepAlivePlayer: AVAudioPlayer?   // 백그라운드 생존용 무음 오디오 (예약~울림 동안 재생)
     private var fireTimer: Timer?                  // 백그라운드에서 정확한 시각에 실제 알람음으로 전환
     private var ringingSoundName: String?     // 현재 울리는 중인 사운드 이름 (인터럽션 후 재생 복구용)
-    private var fadeTimer: Timer?
-    private let fadeDuration: TimeInterval = 15   // 이 시간(초)에 걸쳐 0 → 최대 볼륨으로 점점 커짐
-    private let fadeStartVolume: Float = 0.06     // 너무 작으면 아예 안 들릴 수 있어 살짝 들리는 정도로 시작
+    private var volumeRampTimer: Timer?       // 점점 키우기: 재생 볼륨을 0→설정값으로 올리는 타이머
+    private var volPreviewFadeTimer: Timer?   // 볼륨 슬라이더 미리듣기 페이드 인/아웃
+    private var ringVolume: Float = 1          // 현재 울림 재생 볼륨(램프 중 갱신) — 끊겼다 이어질 때 이 값으로 복구
+    private let rampStep: Float = 0.1          // 10%씩
+    private let rampInterval: TimeInterval = 2 // 2초에 한 번
+    let defaultVolume: Double = 0.8            // 슬라이더 기본값과 일치
     private let batchCount = 60
-    private let spacing: TimeInterval = 5
+    private let spacing: TimeInterval = 2      // 알림 백업 간격(초) — 볼륨 램프(2초)와 일치
     private let idPrefix = "fromise.alarm."
 
     // 울린 알람을 포그라운드 복귀 시 감지하기 위한 영속 상태
-    private struct Active: Codable { let kind: String; let fireAt: Date; let sound: String; let fadeIn: Bool }
+    private struct Active: Codable { let kind: String; let fireAt: Date; let sound: String; let fadeIn: Bool; let volume: Double? }
     private var active: Active? {
         get {
             guard let d = UserDefaults.standard.data(forKey: "fromise.activeAlarm"),
@@ -97,7 +108,7 @@ final class AlarmManager: NSObject, ObservableObject {
 
     private func handleAudioInterruptionEnded() {
         if isRinging, let name = ringingSoundName {
-            playLoop(name, fadeIn: false)   // 계속 울리는 중이어야 하면 재생 재개 (페이드는 다시 하지 않음)
+            playLoop(name)   // 계속 울리는 중이어야 하면 재생 재개 (페이드는 다시 하지 않음)
         } else if keepAlivePlayer != nil {
             // 알람 대기 중 끊겼다 끝난 경우 → 무음 keep-alive 재개해 앱이 백그라운드에서 다시 살아나도록
             try? AVAudioSession.sharedInstance().setActive(true)
@@ -106,10 +117,10 @@ final class AlarmManager: NSObject, ObservableObject {
     }
 
     // MARK: 예약
-    /// fireDate에 울리고 5초 간격으로 batchCount회 반복 예약
-    func schedule(kind: Kind, fireDate: Date, sound: String, fadeIn: Bool = true) {
+    /// fireDate에 울리고 2초 간격으로 batchCount회 반복 예약
+    func schedule(kind: Kind, fireDate: Date, sound: String, fadeIn: Bool = true, volume: Double) {
         cancelNotifications()
-        active = Active(kind: kind.rawValue, fireAt: fireDate, sound: sound, fadeIn: fadeIn)
+        active = Active(kind: kind.rawValue, fireAt: fireDate, sound: sound, fadeIn: fadeIn, volume: volume)
 
         let title = kind == .timer ? "타이머를 확인해주세요!" : "알람을 확인해주세요!"
         let body  = kind == .timer ? "Fromise를 열어서 타이머를 꺼 주세요!" : "Fromise를 열어서 알람을 꺼 주세요!"
@@ -130,7 +141,8 @@ final class AlarmManager: NSObject, ObservableObject {
         // 백그라운드/잠금에서도 무음·DND를 뚫고 울리도록: 예약 시점부터 무음 오디오로 앱을 살려두고,
         // 정확한 시각에 실제 알람음으로 전환한다. (강제종료된 경우엔 위의 Critical 알림이 대비)
         startKeepAlive()
-        scheduleFireTimer(at: fireDate, kind: kind, sound: sound, fadeIn: fadeIn)
+        // 재생 볼륨(0%→설정값 램프 등)은 실제 울릴 때 player.volume 으로 제어한다(아래 startRinging).
+        scheduleFireTimer(at: fireDate, kind: kind, sound: sound, fadeIn: fadeIn, volume: volume)
     }
 
     private func notifSound(_ name: String) -> UNNotificationSound {
@@ -159,12 +171,12 @@ final class AlarmManager: NSObject, ObservableObject {
         fireTimer?.invalidate(); fireTimer = nil
     }
     /// 백그라운드 오디오로 앱이 깨어 있는 동안, 알람 시각에 맞춰 실제 알람음으로 전환.
-    private func scheduleFireTimer(at fireDate: Date, kind: Kind, sound: String, fadeIn: Bool) {
+    private func scheduleFireTimer(at fireDate: Date, kind: Kind, sound: String, fadeIn: Bool, volume: Double) {
         fireTimer?.invalidate(); fireTimer = nil
         let delay = fireDate.timeIntervalSinceNow
-        guard delay > 0 else { fireNow(kind: kind, sound: sound, fadeIn: fadeIn); return }
+        guard delay > 0 else { fireNow(kind: kind, sound: sound, fadeIn: fadeIn, volume: volume); return }
         let t = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.fireNow(kind: kind, sound: sound, fadeIn: fadeIn) }
+            Task { @MainActor [weak self] in self?.fireNow(kind: kind, sound: sound, fadeIn: fadeIn, volume: volume) }
         }
         // 백그라운드에서도 RunLoop 가 돌도록 common 모드에 등록
         RunLoop.main.add(t, forMode: .common)
@@ -190,13 +202,14 @@ final class AlarmManager: NSObject, ObservableObject {
     }
 
     /// 예약/대기 중인 모든 것을 완전히 취소(정지 버튼·종료·새 예약 시).
-    /// ※ 발화 후 "울리는 중"에는 호출하지 않는다 — 호출하면 5초 간격 백업 알림까지 지워져 백그라운드 울림이 끊긴다.
+    /// ※ 발화 후 "울리는 중"에는 호출하지 않는다 — 호출하면 2초 간격 백업 알림까지 지워져 백그라운드 울림이 끊긴다.
     func cancelNotifications() {
         let ids = (0..<batchCount).map { "\(idPrefix)\($0)" }
         center.removePendingNotificationRequests(withIdentifiers: ids)
         center.removeDeliveredNotifications(withIdentifiers: ids)
         center.setBadgeCount(0)
         stopKeepAlive()
+        volumeRampTimer?.invalidate(); volumeRampTimer = nil
         active = nil   // 더 이상 대기/활성 알람 없음 (정지 시 stale 상태로 남아 나중에 헛울리는 것 방지)
     }
 
@@ -204,19 +217,19 @@ final class AlarmManager: NSObject, ObservableObject {
     func stop() {
         isRinging = false
         stopSound()
-        fadeTimer?.invalidate(); fadeTimer = nil
+        volumeRampTimer?.invalidate(); volumeRampTimer = nil
         ringingSoundName = nil
         cancelNotifications()
         active = nil
         RingingWindow.shared.show(false, alarm: self)
     }
 
-    /// 즉시 울림. 무음 keep-alive/발화 타이머만 정리하고, 5초 간격 백업 알림은 그대로 둔다.
-    /// → 앱이 백그라운드/잠금/강제종료 상태여도 알림이 5초마다 계속 울려 사용자를 깨운다(종료 버튼을 누를 때까지).
-    func fireNow(kind: Kind, sound: String, fadeIn: Bool = true) {
+    /// 즉시 울림. 무음 keep-alive/발화 타이머만 정리하고, 2초 간격 백업 알림은 그대로 둔다.
+    /// → 앱이 백그라운드/잠금/강제종료 상태여도 알림이 2초마다 계속 울려 사용자를 깨운다(종료 버튼을 누를 때까지).
+    func fireNow(kind: Kind, sound: String, fadeIn: Bool = true, volume: Double) {
         guard !isRinging else { return }
         stopKeepAlive()
-        startRinging(kind: kind, sound: sound, fadeIn: fadeIn)
+        startRinging(kind: kind, sound: sound, fadeIn: fadeIn, volume: volume)
     }
 
     /// 앱이 다시 활성화될 때 — 이미 울린 알람이 있으면 인앱 울림으로 인계.
@@ -227,73 +240,69 @@ final class AlarmManager: NSObject, ObservableObject {
         if isRinging {
             RingingWindow.shared.show(true, alarm: self)   // 화면만 다시 보장
             if player?.isPlaying != true, let name = ringingSoundName {
-                playLoop(name, fadeIn: false)              // 혹시 백그라운드에서 재생이 끊겼다면 이어서 재생
+                playLoop(name)              // 혹시 백그라운드에서 재생이 끊겼다면 이어서 재생
             }
             return
         }
         // 알림으로만 울리고 있다가 처음 앱에 들어온 경우 → 인앱 울림으로 전환.
-        // 이미 울린 알람이라 페이드 없이 곧장 최대 음량으로(들어오자마자 작아지는 느낌 방지).
+        // 이미 울린 알람이라 점점 키우기 없이 곧장 설정 볼륨으로(들어오자마자 작아지는 느낌 방지).
         stopKeepAlive()
-        startRinging(kind: Kind(rawValue: a.kind) ?? .timer, sound: a.sound, fadeIn: false)
+        startRinging(kind: Kind(rawValue: a.kind) ?? .timer, sound: a.sound, fadeIn: false,
+                     volume: a.volume ?? defaultVolume)
     }
 
     // MARK: 인앱 울림
-    private func startRinging(kind: Kind, sound: String, fadeIn: Bool) {
+    private func startRinging(kind: Kind, sound: String, fadeIn: Bool, volume: Double) {
         ringingKind = kind
         isRinging = true
         RingingWindow.shared.show(true, alarm: self)   // 즉시 최상단 표시
-        playLoop(sound, fadeIn: fadeIn)
+        volumeRampTimer?.invalidate(); volumeRampTimer = nil
+        let target = max(0, min(1, Float(volume)))
+        // 점점 키우기 ON → 0에서 시작해 램프, OFF → 곧장 설정 볼륨으로.
+        ringVolume = fadeIn ? 0 : target
+        playLoop(sound)
+        if fadeIn { startVolumeRamp(to: target) }
     }
-    /// fadeIn이 true면 작은 소리로 시작해서 fadeDuration에 걸쳐 점점 커짐.
-    /// (잠금화면 알림음(caf)에는 적용 안 됨 — iOS 시스템 사운드라 볼륨 제어가 불가능한 제약)
-    private func playLoop(_ name: String, fadeIn: Bool) {
+    /// 점점 키우기: 재생 볼륨을 ringStep(10%)씩 rampInterval(2초)마다 target까지 올린다.
+    /// player.volume 을 직접 올리므로 앱이 백그라운드/잠금이어도 확실히 동작한다.
+    /// ※ 잠금화면 알림음(caf)은 '벨소리' 볼륨이라 이 제어가 적용되지 않는다(인앱 재생음만 적용).
+    private func startVolumeRamp(to target: Float) {
+        volumeRampTimer?.invalidate(); volumeRampTimer = nil
+        let t = Timer(timeInterval: rampInterval, repeats: true) { [weak self] timer in
+            Task { @MainActor [weak self] in
+                guard let self, self.isRinging, let p = self.player else {
+                    timer.invalidate(); self?.volumeRampTimer = nil; return
+                }
+                self.ringVolume = min(target, self.ringVolume + self.rampStep)
+                p.volume = self.ringVolume
+                if self.ringVolume >= target { timer.invalidate(); self.volumeRampTimer = nil }
+            }
+        }
+        RunLoop.main.add(t, forMode: .common)   // 백그라운드에서도 돌도록
+        volumeRampTimer = t
+    }
+    /// 현재 ringVolume 으로 알람음 무한 재생. (끊겼다 이어질 때도 이 함수로 같은 볼륨 복구)
+    private func playLoop(_ name: String) {
         ringingSoundName = name
-        fadeTimer?.invalidate(); fadeTimer = nil
         let s = AVAudioSession.sharedInstance()
         try? s.setCategory(.playback, options: [])
         try? s.setActive(true)
-        let url = Bundle.main.url(forResource: name, withExtension: "mp3")
-            ?? Bundle.main.url(forResource: name, withExtension: "mp3", subdirectory: "alarm")
-        guard let url else { return }
+        guard let url = bundleSoundURL(name) else { return }
         player = try? AVAudioPlayer(contentsOf: url)
         player?.delegate = self                 // 끝까지 다 돌고도 멈추면 delegate에서 다시 이어 재생
         player?.numberOfLoops = -1               // 무한 반복
+        player?.volume = ringVolume              // 현재 램프 단계의 재생 볼륨
         player?.prepareToPlay()
-        if fadeIn {
-            player?.volume = fadeStartVolume
-            player?.play()
-            startFade()
-        } else {
-            player?.volume = 1
-            player?.play()
-        }
-    }
-    /// fadeStartVolume → 1.0 까지 fadeDuration에 걸쳐 선형으로 키움
-    private var fadeStep = 0
-    private func startFade() {
-        let steps = 30
-        let interval = fadeDuration / Double(steps)
-        fadeStep = 0
-        fadeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self, let p = self.player, self.isRinging else {
-                    self?.fadeTimer?.invalidate(); self?.fadeTimer = nil; return
-                }
-                self.fadeStep += 1
-                let progress = Double(self.fadeStep) / Double(steps)
-                p.volume = Float(min(1, Double(self.fadeStartVolume) + progress * Double(1 - self.fadeStartVolume)))
-                if self.fadeStep >= steps {
-                    p.volume = 1
-                    self.fadeTimer?.invalidate()
-                    self.fadeTimer = nil
-                }
-            }
-        }
+        player?.play()
     }
     private func stopSound() {
         player?.stop()
         player = nil
-        fadeTimer?.invalidate(); fadeTimer = nil
+    }
+    /// 번들 루트 또는 alarm/ 하위에서 mp3 찾기.
+    private func bundleSoundURL(_ name: String) -> URL? {
+        Bundle.main.url(forResource: name, withExtension: "mp3")
+            ?? Bundle.main.url(forResource: name, withExtension: "mp3", subdirectory: "alarm")
     }
 
     // MARK: 미리듣기 (소리 1/2/3 버튼 선택 시)
@@ -305,9 +314,7 @@ final class AlarmManager: NSObject, ObservableObject {
         let s = AVAudioSession.sharedInstance()
         try? s.setCategory(.playback, options: [.mixWithOthers])
         try? s.setActive(true)
-        guard let url = Bundle.main.url(forResource: name, withExtension: "mp3")
-            ?? Bundle.main.url(forResource: name, withExtension: "mp3", subdirectory: "alarm")
-        else { return }
+        guard let url = bundleSoundURL(name) else { return }
         previewPlayer = try? AVAudioPlayer(contentsOf: url)
         previewPlayer?.delegate = self     // 끝까지 다 들으면 previewingSound도 자동으로 풀려서 버튼 강조가 꺼짐
         previewPlayer?.prepareToPlay()
@@ -316,9 +323,69 @@ final class AlarmManager: NSObject, ObservableObject {
     }
     /// 미리듣기 정지 (버튼 다시 탭 / 알람·타이머 시작 / 탭 전환 / 화면 닫힘 시 호출)
     func stopPreview() {
+        volPreviewFadeTimer?.invalidate(); volPreviewFadeTimer = nil
         previewPlayer?.stop()
         previewPlayer = nil
         previewingSound = nil
+    }
+
+    // MARK: 볼륨 미리듣기 (볼륨 슬라이더 핸들을 잡고 있는 동안)
+    // 슬라이더 핸들을 잡으면 선택된 알람음을 페이드로 시작, 잡고 좌우로 움직이면 그 %로 즉시 미리듣기,
+    // 손을 놓으면 페이드로 멈춘다. (기기 볼륨이 아니라 재생기 볼륨으로만 들려줘 실제 기기 볼륨은 안 건드림)
+
+    /// 핸들을 잡았을 때 — 0에서 시작해 현재 슬라이더 값까지 페이드 인.
+    func startVolumePreview(_ name: String, volume: Float) {
+        stopPreview()
+        let s = AVAudioSession.sharedInstance()
+        try? s.setCategory(.playback, options: [.mixWithOthers])
+        try? s.setActive(true)
+        guard let url = bundleSoundURL(name) else { return }
+        previewPlayer = try? AVAudioPlayer(contentsOf: url)
+        previewPlayer?.delegate = self
+        previewPlayer?.numberOfLoops = -1     // 잡고 있는 동안 계속 반복
+        previewPlayer?.volume = 0
+        previewPlayer?.prepareToPlay()
+        previewPlayer?.play()
+        previewingSound = name
+        fadeVolumePreview(to: max(0, min(1, volume)))
+    }
+    /// 잡은 채 좌우로 움직이는 중 — 해당 %로 즉시 반영(페이드 없이).
+    func updateVolumePreview(_ volume: Float) {
+        guard previewPlayer != nil else { return }
+        volPreviewFadeTimer?.invalidate(); volPreviewFadeTimer = nil
+        previewPlayer?.volume = max(0, min(1, volume))
+    }
+    /// 손을 놓았을 때 — 페이드 아웃 후 정지.
+    func stopVolumePreview() {
+        guard previewPlayer != nil else { return }
+        fadeVolumePreview(to: 0) { [weak self] in
+            self?.previewPlayer?.stop()
+            self?.previewPlayer = nil
+            self?.previewingSound = nil
+        }
+    }
+    /// previewPlayer 볼륨을 target까지 약 0.4초에 걸쳐 부드럽게 이동.
+    private func fadeVolumePreview(to target: Float, completion: (() -> Void)? = nil) {
+        volPreviewFadeTimer?.invalidate(); volPreviewFadeTimer = nil
+        guard let start = previewPlayer?.volume else { completion?(); return }
+        let steps = 12
+        var i = 0
+        let t = Timer(timeInterval: 0.4 / Double(steps), repeats: true) { [weak self] timer in
+            Task { @MainActor [weak self] in
+                guard let self, let p = self.previewPlayer else {
+                    timer.invalidate(); self?.volPreviewFadeTimer = nil; completion?(); return
+                }
+                i += 1
+                p.volume = start + (target - start) * Float(i) / Float(steps)
+                if i >= steps {
+                    p.volume = target
+                    timer.invalidate(); self.volPreviewFadeTimer = nil
+                    completion?()
+                }
+            }
+        }
+        RunLoop.main.add(t, forMode: .common)
+        volPreviewFadeTimer = t
     }
 
     // MARK: 기록
@@ -354,7 +421,7 @@ extension AlarmManager: AVAudioPlayerDelegate {
                 return
             }
             guard self.isRinging, let name = self.ringingSoundName else { return }
-            self.playLoop(name, fadeIn: false)
+            self.playLoop(name)
         }
     }
     nonisolated func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
@@ -366,7 +433,7 @@ extension AlarmManager: AVAudioPlayerDelegate {
                 return
             }
             guard self.isRinging, let name = self.ringingSoundName else { return }
-            self.playLoop(name, fadeIn: false)
+            self.playLoop(name)
         }
     }
 }
@@ -379,7 +446,8 @@ extension AlarmManager: UNUserNotificationCenterDelegate {
         let kindRaw = notification.request.content.userInfo["kind"] as? String ?? "timer"
         Task { @MainActor [weak self] in
             guard let self else { return }
-            self.fireNow(kind: Kind(rawValue: kindRaw) ?? .timer, sound: self.activeSound ?? "1", fadeIn: self.activeFadeIn ?? true)
+            self.fireNow(kind: Kind(rawValue: kindRaw) ?? .timer, sound: self.activeSound ?? "1",
+                         fadeIn: self.activeFadeIn ?? true, volume: self.active?.volume ?? self.defaultVolume)
         }
         completionHandler([])
     }

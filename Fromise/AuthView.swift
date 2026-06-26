@@ -222,11 +222,13 @@ struct VerifyView: View {
             Image(systemName: "envelope.badge")
                 .font(.system(size: 44, weight: .semibold)).foregroundStyle(Theme.ink)
                 .frame(width: 92, height: 92).background(Theme.hlCheese.opacity(0.5)).clipShape(Circle())
-            Text("메일함을 확인해 주세요")
-                .font(.system(size: 22, weight: .heavy)).foregroundStyle(Theme.ink).padding(.top, 22)
-            Text("\(auth.pendingEmail) 로\n인증 링크를 보냈어요.\n링크를 누른 뒤 아래 버튼을 눌러주세요.")
-                .font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.ink2)
-                .multilineTextAlignment(.center).lineSpacing(3).padding(.top, 10)
+
+            Text("\(auth.pendingEmail) 로\n인증 링크를 보냈어요.")
+                .font(.system(size: 18, weight: .heavy)).foregroundStyle(Theme.ink)
+                .multilineTextAlignment(.center).lineSpacing(3).padding(.top, 22)
+            
+            Text("메일이 도착하지 않는다면 스팸함을 확인해주세요.")
+                .font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.ink2).padding(.top, 16)
 
             if !auth.errorMessage.isEmpty {
                 Text(auth.errorMessage).font(.system(size: 12.5, weight: .semibold))

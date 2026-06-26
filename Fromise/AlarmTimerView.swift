@@ -12,6 +12,7 @@ struct AlarmTimerView: View {
     @State private var mode: Mode = .timer
     @AppStorage("alarm.sound") private var sound = "1"
     @AppStorage("alarm.fadeIn") private var fadeIn = true   // 소리 점점 키우기
+    @AppStorage("alarm.volume") private var volume = 0.8    // 알람/타이머 재생 볼륨(0~1)
     // 화면에 보이는 글자(label)와 실제 사운드 파일 이름(key, 1.mp3/2.mp3/3.mp3 · alarm1.caf 등)을 분리.
     // label만 원하는 대로 바꿔도 key는 그대로라 파일을 정상적으로 찾음.
     private let soundChoices: [(label: String, key: String)] = [("아침", "1"), ("알림", "2"), ("축제", "3")]
@@ -182,10 +183,37 @@ struct AlarmTimerView: View {
                 Spacer()
             }
 
+            // 재생 볼륨: 핸들을 잡으면 그 %로 미리듣기(페이드 인), 좌우로 움직이면 즉시 반영, 놓으면 페이드 아웃.
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("재생 볼륨").font(.system(size: 13, weight: .heavy)).foregroundStyle(Theme.ink3)
+                    Spacer()
+                    Text("\(Int((volume * 100).rounded()))%")
+                        .font(.system(size: 13, weight: .heavy)).monospacedDigit().foregroundStyle(Theme.ink2)
+                }
+                HStack(spacing: 10) {
+                    Image(systemName: "speaker.fill").font(.system(size: 12)).foregroundStyle(Theme.ink3)
+                    Slider(value: $volume, in: 0...1,
+                           onEditingChanged: { editing in
+                               if editing { alarm.startVolumePreview(sound, volume: Float(volume)) }
+                               else { alarm.stopVolumePreview() }
+                           })
+                        .tint(Theme.ink)
+                    Image(systemName: "speaker.wave.3.fill").font(.system(size: 12)).foregroundStyle(Theme.ink3)
+                }
+                .onChange(of: volume) { alarm.updateVolumePreview(Float(volume)) }
+            }
+            .padding(.horizontal, 14).padding(.vertical, 12)
+            .background(Theme.card)
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.line, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
             Toggle(isOn: $fadeIn) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("소리 점점 키우기").font(.system(size: 13, weight: .heavy)).foregroundStyle(Theme.ink)
-                    Text("작게 시작해서 서서히 커져요").font(.system(size: 11.5, weight: .semibold)).foregroundStyle(Theme.ink3)
+                    Text("기기 볼륨 0%에서 시작해 2초마다 10%씩 설정 볼륨까지 커져요")
+                        .font(.system(size: 11.5, weight: .semibold)).foregroundStyle(Theme.ink3)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .toggleStyle(SwitchToggleStyle(tint: Theme.ink))
@@ -231,7 +259,7 @@ struct AlarmTimerView: View {
             remaining = max(0, r)
             if r <= 0 {
                 running = false; endDate = nil
-                alarm.fireNow(kind: .timer, sound: sound, fadeIn: fadeIn)
+                alarm.fireNow(kind: .timer, sound: sound, fadeIn: fadeIn, volume: volume)
             }
         }
     }
@@ -240,7 +268,7 @@ struct AlarmTimerView: View {
         alarm.stopPreview()   // 시작하면 미리듣기는 정지
         let end = Date().addingTimeInterval(TimeInterval(target))
         endDate = end; remaining = target; running = true
-        alarm.schedule(kind: .timer, fireDate: end, sound: sound, fadeIn: fadeIn)
+        alarm.schedule(kind: .timer, fireDate: end, sound: sound, fadeIn: fadeIn, volume: volume)
     }
     private func stopTimer() {
         running = false; endDate = nil
@@ -253,7 +281,7 @@ struct AlarmTimerView: View {
         let comps = cal.dateComponents([.hour, .minute], from: alarmTime)
         var fire = cal.nextDate(after: Date(), matching: comps, matchingPolicy: .nextTime) ?? Date().addingTimeInterval(60)
         if fire.timeIntervalSinceNow < 1 { fire = fire.addingTimeInterval(86400) }
-        alarm.schedule(kind: .alarm, fireDate: fire, sound: sound, fadeIn: fadeIn)
+        alarm.schedule(kind: .alarm, fireDate: fire, sound: sound, fadeIn: fadeIn, volume: volume)
         alarm.addHistory(hour: comps.hour ?? 0, minute: comps.minute ?? 0)
     }
     private func applyHistory(_ rec: AlarmRecord) {

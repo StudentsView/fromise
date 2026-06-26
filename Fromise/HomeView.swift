@@ -8,6 +8,7 @@ import SwiftUI
 struct HomeView: View {
     var guest: Bool = false
     var onOpen: (RootTabView.Tab) -> Void = { _ in }
+    var onOpen2G: () -> Void = {}
 
     @EnvironmentObject var profile: ProfileStore
     @EnvironmentObject var planner: PlannerStore
@@ -36,7 +37,7 @@ struct HomeView: View {
                     .padding(.horizontal, 20)
 
                 sectionHeader(title: "도구")
-                ToolDock(onOpen: onOpen)
+                ToolDock(onOpen: onOpen, onOpen2G: onOpen2G)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 28)
             }
@@ -226,7 +227,10 @@ struct ProgressRing: View {
 // MARK: - 도구 독
 struct ToolDock: View {
     var onOpen: (RootTabView.Tab) -> Void = { _ in }
-    @State private var showClock = false
+    var onOpen2G: () -> Void = {}
+    // 시계(알람/타이머) 기능 — 코드는 그대로 두고 메인에서 잠시 비활성화.
+    // 다시 켜려면 이 줄과 아래 smallTool(.clock ...) · .sheet(...AlarmTimerView()) 주석을 해제.
+    // @State private var showClock = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -251,11 +255,13 @@ struct ToolDock: View {
             .buttonStyle(.plain)
 
             HStack(spacing: 12) {
-                smallTool(.clock, bg: Theme.hlSky, name: "시계", desc: "이어폰 알람과 타이머") { showClock = true }
+                // 시계가 있던 자리에 2G폰 모드 배치 (시계는 비활성화) → 설정 탭의 2G폰 모드 화면으로 이동
+                // smallTool(.clock, bg: Theme.hlSky, name: "시계", desc: "이어폰 알람과 타이머") { showClock = true }
+                smallTool(.lock, bg: Theme.hlSky, name: "2G폰 모드", desc: "5G → 2G 다운그레이드") { onOpen2G() }
                 smallTool(.log, bg: Theme.hlMint, name: "기록", desc: "스마트폰 미사용 시간 기록") { onOpen(.log) }
             }
         }
-        .sheet(isPresented: $showClock) { AlarmTimerView() }
+        // .sheet(isPresented: $showClock) { AlarmTimerView() }   // 시계 기능 비활성화(코드 유지)
     }
 
     private func smallTool(_ icon: AppIcon, bg: Color, name: String, desc: String,

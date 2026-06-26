@@ -10,10 +10,12 @@ struct RootTabView: View {
     enum Tab: Hashable { case home, planner, bell, log, settings }
     var guest: Bool = false
     @State private var tab: Tab = .home
+    @State private var settingsPath: [SettingsRoute] = []   // 홈에서 설정 탭의 특정 화면으로 바로 이동
 
     var body: some View {
         TabView(selection: $tab) {
-            HomeView(guest: guest, onOpen: { tab = $0 })
+            HomeView(guest: guest, onOpen: { tab = $0 },
+                     onOpen2G: { settingsPath = [.twoG]; tab = .settings })
                 .tabItem { Label { Text("홈") } icon: { Icon(.home, size: 18) } }
                 .tag(Tab.home)
 
@@ -31,7 +33,7 @@ struct RootTabView: View {
                 .tabItem { Label { Text("기록") } icon: { Icon(.log, size: 18) } }
                 .tag(Tab.log)
 
-            SettingsView()
+            SettingsView(path: $settingsPath)
                 .guestLocked(guest, feature: "설정")
                 .tabItem { Label { Text("설정") } icon: { Icon(.settings, size: 18) } }
                 .tag(Tab.settings)

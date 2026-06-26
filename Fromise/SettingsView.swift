@@ -5,6 +5,9 @@ import SwiftUI
 //  로그아웃은 계정관리(AccountView) 안으로 이동.
 // ─────────────────────────────────────────────────────────────
 
+// 홈 등 외부에서 설정 탭의 특정 화면으로 바로 이동하기 위한 경로
+enum SettingsRoute: Hashable { case twoG }
+
 struct SettingsView: View {
     @EnvironmentObject var auth: AuthStore
     @EnvironmentObject var profile: ProfileStore
@@ -13,9 +16,10 @@ struct SettingsView: View {
     @State private var showFeedback = false
     @State private var showBirth = false
     @Environment(\.openURL) private var openURL
+    @Binding var path: [SettingsRoute]
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 VStack(spacing: 16) {
                     // 계정
@@ -45,7 +49,7 @@ struct SettingsView: View {
 
                     // 집중
                     card("집중") {
-                        NavigationLink { TwoGModeView() } label: {
+                        NavigationLink(value: SettingsRoute.twoG) {
                             row("2G폰 모드", value: two.active ? "진행 중" : "꺼짐", chevron: true)
                         }.buttonStyle(.plain)
                     }
@@ -73,6 +77,9 @@ struct SettingsView: View {
             .background(Theme.paper.ignoresSafeArea())
             .navigationTitle("설정")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: SettingsRoute.self) { route in
+                switch route { case .twoG: TwoGModeView() }
+            }
         }
         .sheet(isPresented: $showNick) { NicknameSheet() }
         .sheet(isPresented: $showFeedback) { FeedbackSheet(defaultEmail: auth.email) }
