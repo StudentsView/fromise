@@ -15,8 +15,6 @@ struct BellView: View {
     @State private var bannerVisible = false
     @State private var bannerMsg = ""
     @Environment(\.scenePhase) private var scenePhase
-    @State private var panelExpanded = false
-    @State private var drag: CGFloat = 0
     @State private var fullscreen = false
     @AppStorage("bell.dark") private var dark = false
 
@@ -35,11 +33,16 @@ struct BellView: View {
                         VStack(spacing: 0) {
                             heroPortrait.padding(.horizontal, 20).padding(.top, 8)
                             Spacer(minLength: 0)
+                            // 타종 박스 하단 공백에 320x50 배너 — 스크롤 없이 한 화면 노출
+                            AdFitBanner()
+                                .frame(width: 320, height: 50)
+                                .frame(maxWidth: .infinity)
+                            Spacer(minLength: 0)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .padding(.bottom, 46)
 
-                        segmentPanel(geo: geo)
+                        SegmentPanel(engine: engine, jump: $jump, geo: geo)
                     }
 
                     if bannerVisible {
@@ -279,7 +282,7 @@ struct BellView: View {
             ScrollView {
                 VStack(spacing: 6) {
                     ForEach(engine.schedule.indices, id: \.self) { i in
-                        segmentRow(i).id(i)
+                        SegmentRow(engine: engine, index: i, jump: $jump).id(i)
                     }
                 }
                 .padding(.vertical, 4)
@@ -347,8 +350,18 @@ struct BellView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: 하단 슬라이드 구간 패널
-    private func segmentPanel(geo: GeometryProxy) -> some View {
+}
+
+// MARK: - 하단 슬라이드 구간 패널 (독립 뷰: 드래그가 BellView 전체를 다시 그리지 않게 분리)
+private struct SegmentPanel: View {
+    @ObservedObject var engine: BellEngine
+    @Binding var jump: JumpTarget?
+    let geo: GeometryProxy
+    @Environment(\.bellSkin) private var skin
+    @State private var panelExpanded = false
+    @State private var drag: CGFloat = 0
+
+    var body: some View {
         let peek: CGFloat = 44
         let fullH = min(geo.size.height * 0.74, geo.size.height - 24)
         let collapsedOffset = max(0, fullH - peek)
@@ -372,7 +385,9 @@ struct BellView: View {
                 withAnimation(spring) { panelExpanded.toggle() }
             }
             .gesture(
-                DragGesture()
+                // .global = 화면 기준 고정 좌표계. 패널이 .offset으로 움직여도
+                // translation이 흔들리지 않아 손가락을 1:1로 따라간다.
+                DragGesture(coordinateSpace: .global)
                     .onChanged { v in drag = v.translation.height }
                     .onEnded { v in
                         let t = v.translation.height
@@ -389,7 +404,7 @@ struct BellView: View {
                 ScrollView {
                     VStack(spacing: 6) {
                         ForEach(engine.schedule.indices, id: \.self) { i in
-                            segmentRow(i).id(i)
+                            SegmentRow(engine: engine, index: i, jump: $jump).id(i)
                         }
                     }
                     .padding(.horizontal, 18).padding(.bottom, 28)
@@ -407,16 +422,25 @@ struct BellView: View {
         .shadow(color: .black.opacity(0.08), radius: 13, y: -4)
         .offset(y: off)
     }
-    private func segmentRow(_ i: Int) -> some View {
-        let seg = engine.schedule[i]
-        let active = i == engine.activeIndex
+}
+
+// MARK: - 구간 한 줄 (세로 패널·가로 목록 공용)
+private struct SegmentRow: View {
+    @ObservedObject var engine: BellEngine
+    let index: Int
+    @Binding var jump: JumpTarget?
+    @Environment(\.bellSkin) private var skin
+
+    var body: some View {
+        let seg = engine.schedule[index]
+        let active = index == engine.activeIndex
         let accent = BellPalette.subject(seg.subject)
-        return Button { jump = JumpTarget(index: i) } label: {
+        return Button { jump = JumpTarget(index: index) } label: {
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 2)
                     .fill(seg.phase == .exam ? accent : (seg.phase == .prep ? skin.ink3 : skin.line))
                     .frame(width: 4, height: active ? 34 : 26)
-                Text(engine.rangeText(i))
+                Text(engine.rangeText(index))
                     .font(.system(size: 12, weight: .bold, design: .rounded)).monospacedDigit()
                     .foregroundStyle(active ? skin.ink2 : skin.ink3)
                     .frame(width: 96, alignment: .leading)

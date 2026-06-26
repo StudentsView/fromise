@@ -2,10 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- 알람/타이머가 백그라운드·잠금 상태에서도 계속 울리도록 오디오 백그라운드 모드 사용.
-	     예약 시점부터 무음 오디오를 .playback으로 재생해 앱을 살려두고,
-	     알람 시각이 되면 실제 알람음으로 전환한다. (.playback은 무음 스위치를 무시하고,
-	     실제 오디오 재생이라 방해금지모드와도 무관하게 소리가 난다) -->
+	<key>NSAppTransportSecurity</key>
+	<dict/>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>사용자의 데이터는 개인화된 광고를 제공하고, 부적절한 광고를 제어하기 위해 사용됩니다.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

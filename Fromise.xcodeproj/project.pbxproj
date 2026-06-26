@@ -10,6 +10,7 @@
 		4312A2D52FE2C04C00522F89 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 4312A2D42FE2C04C00522F89 /* Supabase */; };
 		43343E362FEB66A40095DCE9 /* DeviceActivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 43343E352FEB66A40095DCE9 /* DeviceActivity.framework */; };
 		43343E3E2FEB66A40095DCE9 /* FromiseMonitor.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 43343E342FEB66A40095DCE9 /* FromiseMonitor.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		43B27B122FEF4122003C18CB /* AdFitSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 43B27B112FEF4122003C18CB /* AdFitSDK */; };
 		43F1AA01000000000000AB00 /* FromiseWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 43F1AA01000000000000A200 /* FromiseWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -108,6 +109,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				43B27B122FEF4122003C18CB /* AdFitSDK in Frameworks */,
 				4312A2D52FE2C04C00522F89 /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -183,6 +185,7 @@
 			name = Fromise;
 			packageProductDependencies = (
 				4312A2D42FE2C04C00522F89 /* Supabase */,
+				43B27B112FEF4122003C18CB /* AdFitSDK */,
 			);
 			productName = Fromise;
 			productReference = 4312A29E2FE26F9F00522F89 /* Fromise.app */;
@@ -265,6 +268,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				4312A2C82FE2ADAD00522F89 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				43B27B0E2FEED454003C18CB /* XCRemoteSwiftPackageReference "adfit-spm" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4312A29F2FE26F9F00522F89 /* Products */;
@@ -722,6 +726,14 @@
 				minimumVersion = 2.5.1;
 			};
 		};
+		43B27B0E2FEED454003C18CB /* XCRemoteSwiftPackageReference "adfit-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/adfit/adfit-spm.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.21.24;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -729,6 +741,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 4312A2C82FE2ADAD00522F89 /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
+		};
+		43B27B112FEF4122003C18CB /* AdFitSDK */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 43B27B0E2FEED454003C18CB /* XCRemoteSwiftPackageReference "adfit-spm" */;
+			productName = AdFitSDK;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
