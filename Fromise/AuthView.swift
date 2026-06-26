@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 // ─────────────────────────────────────────────────────────────
 //  AuthView.swift — 첫 화면 (타이핑 로고 → 시작하기 → 이메일 → 비밀번호)
@@ -123,6 +124,9 @@ struct AuthView: View {
     // 이메일 → 비밀번호 폼
     private var formBlock: some View {
         VStack(spacing: 12) {
+            appleButton          // 이메일 없이 애플 아이디로 로그인
+            orDivider
+
             inputField("이메일", text: $email, field: .email, secure: false, keyboard: .emailAddress)
 
             if showPw {
@@ -150,6 +154,40 @@ struct AuthView: View {
             }
             .padding(.top, 2)
         }
+    }
+
+    // Apple로 로그인 (이메일 없이) — 해시 nonce는 Apple에, 원본 nonce는 Supabase에
+    private var appleButton: some View {
+        SignInWithAppleButton(.signIn) { request in
+            request.requestedScopes = [.fullName, .email]
+            request.nonce = auth.makeAppleNonce()
+        } onCompletion: { result in
+            handleApple(result)
+        }
+        .signInWithAppleButtonStyle(.black)
+        .frame(height: 52)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+    private func handleApple(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .success(let authResults):
+            guard let cred = authResults.credential as? ASAuthorizationAppleIDCredential else { return }
+            Task { await auth.signInWithApple(credential: cred) }
+        case .failure(let error):
+            // 사용자가 취소한 경우엔 에러 메시지를 띄우지 않음
+            if (error as? ASAuthorizationError)?.code != .canceled {
+                auth.errorMessage = "Apple 로그인에 실패했어요. 다시 시도해 주세요."
+            }
+        }
+    }
+
+    private var orDivider: some View {
+        HStack(spacing: 10) {
+            Rectangle().fill(Theme.line).frame(height: 1)
+            Text("또는 이메일로").font(.system(size: 11.5, weight: .bold)).foregroundStyle(Theme.ink3).fixedSize()
+            Rectangle().fill(Theme.line).frame(height: 1)
+        }
+        .padding(.vertical, 2)
     }
 
     private var submitButton: some View {

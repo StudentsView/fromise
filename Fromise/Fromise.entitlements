@@ -2,10 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Critical Alerts(긴급 경고) 엔타이틀먼트는 Apple 승인 후에 추가한다(미승인 상태로 두면 실기기 서명 실패).
-	     신청: https://developer.apple.com/contact/request/notifications-critical-alerts-entitlement
-	     승인되면 아래 한 줄을 다시 넣고 AlarmManager 의 critical 코드를 켤 것:
-	       <key>com.apple.developer.usernotifications.critical-alerts</key><true/> -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
 	<key>com.apple.developer.family-controls</key>
 	<true/>
 	<key>com.apple.security.application-groups</key>

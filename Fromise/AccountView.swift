@@ -28,18 +28,28 @@ struct AccountView: View {
                 }
                 .card()
 
-                // 비밀번호 변경
-                Button { showPw = true } label: {
+                // 비밀번호 변경 — Apple로만 가입한 계정은 비밀번호가 없으므로 숨김
+                if auth.isAppleOnlyAccount {
                     HStack(spacing: 12) {
-                        Image(systemName: "key.fill").font(.system(size: 14, weight: .semibold))
+                        Image(systemName: "applelogo").font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Theme.ink2).frame(width: 22)
-                        Text("비밀번호 변경").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.ink)
+                        Text("Apple로 로그인된 계정이에요").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.ink2)
                         Spacer()
-                        Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.ink3)
                     }
                     .card()
+                } else {
+                    Button { showPw = true } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "key.fill").font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Theme.ink2).frame(width: 22)
+                            Text("비밀번호 변경").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.ink)
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.ink3)
+                        }
+                        .card()
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
 
                 // 로그아웃
                 Button { confirmOut = true } label: {
@@ -93,7 +103,8 @@ struct DeleteAccountSheet: View {
     @State private var err = ""
 
     private let phrase = "Good Bye, Fromise"
-    private var canDelete: Bool { !pw.isEmpty && confirmText == phrase }
+    // Apple 전용 계정은 비밀번호가 없으므로 확인 문구만으로 탈퇴 가능
+    private var canDelete: Bool { (auth.isAppleOnlyAccount || !pw.isEmpty) && confirmText == phrase }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -115,14 +126,16 @@ struct DeleteAccountSheet: View {
                     .background(Theme.danger.opacity(0.08))
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
-                    // 비밀번호
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text("현재 비밀번호").font(.system(size: 12, weight: .heavy)).foregroundStyle(Theme.ink3)
-                        SecureField("비밀번호", text: $pw)
-                            .font(.system(size: 15, weight: .semibold)).autocorrectionDisabled()
-                            .padding(13).background(Theme.card)
-                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.line, lineWidth: 1))
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    // 비밀번호 — Apple 전용 계정은 비밀번호가 없으므로 생략
+                    if !auth.isAppleOnlyAccount {
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text("현재 비밀번호").font(.system(size: 12, weight: .heavy)).foregroundStyle(Theme.ink3)
+                            SecureField("비밀번호", text: $pw)
+                                .font(.system(size: 15, weight: .semibold)).autocorrectionDisabled()
+                                .padding(13).background(Theme.card)
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.line, lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
                     }
 
                     // 확인 문구
@@ -167,8 +180,11 @@ struct DeleteAccountSheet: View {
     private func delete() {
         busy = true; err = ""
         Task {
-            let ok = await auth.verifyPassword(pw)
-            if !ok { err = "비밀번호가 올바르지 않아요."; busy = false; return }
+            // 이메일 계정만 비밀번호 확인. Apple 전용 계정은 비밀번호가 없어 확인 문구로 대체.
+            if !auth.isAppleOnlyAccount {
+                let ok = await auth.verifyPassword(pw)
+                if !ok { err = "비밀번호가 올바르지 않아요."; busy = false; return }
+            }
             if let e = await auth.deleteAccount() { err = e; busy = false; return }
             // 성공 → auth.phase = .signedOut → RootFlow가 최초 화면으로 전환
             dismiss()
