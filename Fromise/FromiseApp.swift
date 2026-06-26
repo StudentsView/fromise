@@ -32,6 +32,11 @@ struct FromiseApp: App {
                         alarm.appBecameActive()
                         TwoGStore.shared.restore()      // 복귀 시 만료/복원 확인
                         focus.refreshAuthorization()    // 권한 상태 갱신(승인 플래그 저장)
+                    } else if phase == .background {
+                        // 백그라운드 진입 시 위젯 최신화(오늘 누적/플래너/2G)
+                        WidgetBridge.updateStudy(seconds: StudyTracker.shared.todaySeconds)
+                        planner.pushTodayWidget()
+                        WidgetBridge.reloadAll()
                     }
                 }
                 .onChange(of: alarm.isRinging) { _, ringing in

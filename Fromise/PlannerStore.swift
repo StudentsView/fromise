@@ -37,11 +37,22 @@ struct DayData {
 }
 
 final class PlannerStore: ObservableObject {
-    @Published var days: [String: DayData] = [:] { didSet { onChange?() } }
+    @Published var days: [String: DayData] = [:] { didSet { onChange?(); pushTodayWidget() } }
     /// days가 바뀔 때 호출 (Supabase 저장 예약 등). 로그인 시 RootFlow에서 연결.
     var onChange: (() -> Void)? = nil
 
     func day(_ key: String) -> DayData { days[key] ?? DayData() }
+
+    /// 오늘 플래너(상단 항목·완료율·순공/목표 분)를 위젯으로 내보낸다.
+    func pushTodayWidget() {
+        let key = PKey.key(Date())
+        let d = days[key] ?? DayData()
+        let real = d.tasks.filter { !$0.text.trimmingCharacters(in: .whitespaces).isEmpty }
+        WidgetBridge.updatePlanner(dayKey: key,
+                                   tasks: real.map { (text: $0.text, done: $0.done) },
+                                   achievement: d.achievement,
+                                   netMinutes: d.netMinutes, goalMinutes: d.goalMinutes)
+    }
 
     /// DayData 전체에 대한 바인딩 (day.tasks[i].text 식으로 바로 편집 가능)
     func binding(_ key: String) -> Binding<DayData> {

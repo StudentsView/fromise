@@ -64,6 +64,7 @@ final class StudyTracker: ObservableObject {
 
     private init() {
         base = d.integer(forKey: "study.\(ymd)")
+        WidgetBridge.updateStudy(seconds: base)   // 위젯에 초기 오늘 누적 반영
         NotificationCenter.default.addObserver(forName: UIDevice.proximityStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor [weak self] in self?.onProximity() }
         }
@@ -100,6 +101,7 @@ final class StudyTracker: ObservableObject {
         motion.stopDeviceMotionUpdates()
         stopTicker()
         save()
+        WidgetBridge.updateStudy(seconds: base)
     }
 
     // MARK: 센서
@@ -123,6 +125,7 @@ final class StudyTracker: ObservableObject {
         else if !on, let s = segStart {
             base += max(0, Int(Date().timeIntervalSince(s)))
             d.set(base, forKey: "study.\(ymd)")
+            WidgetBridge.updateStudy(seconds: base)   // 위젯에 오늘 누적 반영
             segStart = nil; counting = false; screenOn(); if running { startTicker() }
         }
     }
@@ -153,6 +156,7 @@ final class StudyTracker: ObservableObject {
         setCounting(false)          // 진행 중 세그먼트를 여기까지만 적립하고 멈춤
         stopTicker()                // 백그라운드 → 타이머 정지(배터리)
         if running { save() }       // 잠금/종료 대비 저장 — 백그라운드 시간은 적립하지 않음
+        WidgetBridge.updateStudy(seconds: base)   // 백그라운드 진입 시 위젯 최신화
     }
     private func enterFG() {
         guard running else { return }

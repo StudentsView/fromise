@@ -106,6 +106,7 @@ final class TwoGStore: ObservableObject {
         ud.set(start, forKey: K.startedAt)   // 지속시간 기록 시작점
         endsAt = end
         active = true
+        WidgetBridge.reloadTwoG()            // 위젯에 활성 상태 반영
     }
 
     // MARK: 코드로 해제
@@ -147,6 +148,7 @@ final class TwoGStore: ObservableObject {
             endsAt = end; active = true
             applyShield()                          // 혹시 풀렸으면 재적용(끊김 방지)
             startMonitoring(start: Date(), end: end)
+            WidgetBridge.reloadTwoG()
         } else {
             recordTwoG(end: end)                          // 이미 만료 → 예정 종료까지 기록
             Task { await teardown(deleteRemote: true) }
@@ -174,6 +176,7 @@ final class TwoGStore: ObservableObject {
         center.stopMonitoring([.twoG])
         ud.removeObject(forKey: K.endsAt)
         active = false; endsAt = nil
+        WidgetBridge.reloadTwoG()            // 위젯에 해제 반영
         if deleteRemote, let uid = supabase.auth.currentUser?.id.uuidString {
             _ = try? await supabase.from("two_g_locks").delete().eq("user_id", value: uid).execute()
         }

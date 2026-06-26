@@ -10,6 +10,7 @@
 		4312A2D52FE2C04C00522F89 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 4312A2D42FE2C04C00522F89 /* Supabase */; };
 		43343E362FEB66A40095DCE9 /* DeviceActivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 43343E352FEB66A40095DCE9 /* DeviceActivity.framework */; };
 		43343E3E2FEB66A40095DCE9 /* FromiseMonitor.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 43343E342FEB66A40095DCE9 /* FromiseMonitor.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		43F1AA01000000000000AB00 /* FromiseWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 43F1AA01000000000000A200 /* FromiseWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -19,6 +20,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 43343E332FEB66A40095DCE9;
 			remoteInfo = FromiseMonitor;
+		};
+		43F1AA01000000000000AD00 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4312A2962FE26F9F00522F89 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 43F1AA01000000000000A100;
+			remoteInfo = FromiseWidgetsExtension;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -30,6 +38,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				43343E3E2FEB66A40095DCE9 /* FromiseMonitor.appex in Embed Foundation Extensions */,
+				43F1AA01000000000000AB00 /* FromiseWidgetsExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -40,6 +49,7 @@
 		4312A29E2FE26F9F00522F89 /* Fromise.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Fromise.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		43343E342FEB66A40095DCE9 /* FromiseMonitor.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FromiseMonitor.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		43343E352FEB66A40095DCE9 /* DeviceActivity.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = DeviceActivity.framework; path = System/Library/Frameworks/DeviceActivity.framework; sourceTree = SDKROOT; };
+		43F1AA01000000000000A200 /* FromiseWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FromiseWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -56,6 +66,13 @@
 				Info.plist,
 			);
 			target = 4312A29D2FE26F9F00522F89 /* Fromise */;
+		};
+		43F1AA01000000000000A700 /* Exceptions for "FromiseWidgets" folder in "FromiseWidgetsExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 43F1AA01000000000000A100 /* FromiseWidgetsExtension */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -74,6 +91,14 @@
 				43343E422FEB66A40095DCE9 /* Exceptions for "FromiseMonitor" folder in "FromiseMonitor" target */,
 			);
 			path = FromiseMonitor;
+			sourceTree = "<group>";
+		};
+		43F1AA01000000000000A600 /* FromiseWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				43F1AA01000000000000A700 /* Exceptions for "FromiseWidgets" folder in "FromiseWidgetsExtension" target */,
+			);
+			path = FromiseWidgets;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -95,6 +120,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		43F1AA01000000000000A400 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -103,6 +135,7 @@
 			children = (
 				4312A2A02FE26F9F00522F89 /* Fromise */,
 				43343E372FEB66A40095DCE9 /* FromiseMonitor */,
+				43F1AA01000000000000A600 /* FromiseWidgets */,
 				4312A2D32FE2C04C00522F89 /* Frameworks */,
 				4312A29F2FE26F9F00522F89 /* Products */,
 			);
@@ -113,6 +146,7 @@
 			children = (
 				4312A29E2FE26F9F00522F89 /* Fromise.app */,
 				43343E342FEB66A40095DCE9 /* FromiseMonitor.appex */,
+				43F1AA01000000000000A200 /* FromiseWidgetsExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -141,6 +175,7 @@
 			);
 			dependencies = (
 				43343E3D2FEB66A40095DCE9 /* PBXTargetDependency */,
+				43F1AA01000000000000AC00 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				4312A2A02FE26F9F00522F89 /* Fromise */,
@@ -175,6 +210,28 @@
 			productReference = 43343E342FEB66A40095DCE9 /* FromiseMonitor.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		43F1AA01000000000000A100 /* FromiseWidgetsExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 43F1AA01000000000000AA00 /* Build configuration list for PBXNativeTarget "FromiseWidgetsExtension" */;
+			buildPhases = (
+				43F1AA01000000000000A300 /* Sources */,
+				43F1AA01000000000000A400 /* Frameworks */,
+				43F1AA01000000000000A500 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				43F1AA01000000000000A600 /* FromiseWidgets */,
+			);
+			name = FromiseWidgetsExtension;
+			packageProductDependencies = (
+			);
+			productName = FromiseWidgetsExtension;
+			productReference = 43F1AA01000000000000A200 /* FromiseWidgetsExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -190,6 +247,9 @@
 						LastSwiftMigration = 2650;
 					};
 					43343E332FEB66A40095DCE9 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					43F1AA01000000000000A100 = {
 						CreatedOnToolsVersion = 27.0;
 					};
 				};
@@ -213,6 +273,7 @@
 			targets = (
 				4312A29D2FE26F9F00522F89 /* Fromise */,
 				43343E332FEB66A40095DCE9 /* FromiseMonitor */,
+				43F1AA01000000000000A100 /* FromiseWidgetsExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -226,6 +287,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		43343E322FEB66A40095DCE9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		43F1AA01000000000000A500 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -249,6 +317,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		43F1AA01000000000000A300 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -256,6 +331,11 @@
 			isa = PBXTargetDependency;
 			target = 43343E332FEB66A40095DCE9 /* FromiseMonitor */;
 			targetProxy = 43343E3C2FEB66A40095DCE9 /* PBXContainerItemProxy */;
+		};
+		43F1AA01000000000000AC00 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 43F1AA01000000000000A100 /* FromiseWidgetsExtension */;
+			targetProxy = 43F1AA01000000000000AD00 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -530,6 +610,68 @@
 			};
 			name = Release;
 		};
+		43F1AA01000000000000A800 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = FromiseWidgets/FromiseWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2BL2RG8A9U;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FromiseWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Fromise;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.flmang.Fromise.FromiseWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		43F1AA01000000000000A900 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = FromiseWidgets/FromiseWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2BL2RG8A9U;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FromiseWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Fromise;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.flmang.Fromise.FromiseWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -556,6 +698,15 @@
 			buildConfigurations = (
 				43343E402FEB66A40095DCE9 /* Debug */,
 				43343E412FEB66A40095DCE9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		43F1AA01000000000000AA00 /* Build configuration list for PBXNativeTarget "FromiseWidgetsExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				43F1AA01000000000000A800 /* Debug */,
+				43F1AA01000000000000A900 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
