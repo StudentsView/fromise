@@ -50,6 +50,7 @@ struct RootFlow: View {
         SyncQueue.shared.uploadBirth    = { await a.setBirthOnce($0) }
         SyncQueue.shared.uploadPlanner  = { await PlannerSync.save(from: p); return true }
         Task { await PlannerSync.load(into: p); await SyncQueue.shared.flush() }
+        Task { await TwoGStore.shared.syncFromCloud() }   // 로그인한 '계정'이 2G 활성 계정이면 잠금 적용, 아니면 해제
     }
     private func onSignedOut() {
         profile.reset()

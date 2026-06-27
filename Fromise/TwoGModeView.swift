@@ -25,7 +25,7 @@ struct TwoGModeView: View {
         .navigationTitle("2G폰 모드")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showFocusSetup) { FocusSetupView(focus: focus) }
-        .onAppear { two.restore(); Task { await two.loadStats() } }
+        .onAppear { two.restore(); Task { await two.syncFromCloud(); await two.loadStats() } }
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()

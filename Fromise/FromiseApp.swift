@@ -37,7 +37,8 @@ struct FromiseApp: App {
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active {
                         alarm.appBecameActive()
-                        TwoGStore.shared.restore()      // 복귀 시 만료/복원 확인
+                        TwoGStore.shared.restore()      // 복귀 시 만료/복원 확인(로컬·빠른 경로)
+                        Task { await TwoGStore.shared.syncFromCloud() }  // 계정 기준 클라우드 동기화(잠금 적용/해제)
                         focus.refreshAuthorization()    // 권한 상태 갱신(승인 플래그 저장)
                         requestTrackingIfNeeded()       // 최초 실행 시 ATT 추적 동의 요청
                     } else if phase == .background {

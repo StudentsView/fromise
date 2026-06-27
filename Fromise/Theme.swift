@@ -25,6 +25,7 @@ enum Theme {
     static let paper = Color(hex: 0xF6F2E9)
     static let card  = Color(hex: 0xFFFDF8)
     static let line  = Color(hex: 0xE7E0D2)
+    static let select = Color(hex: 0x14B8A6)   // 타임테이블 드래그 선택 표시(웹과 동일 teal)
     // 형광펜
     static let hlCheese = Color(hex: 0xFCE8A6)
     static let hlSky    = Color(hex: 0xA9D9F5)

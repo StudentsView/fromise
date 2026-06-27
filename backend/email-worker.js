@@ -21,16 +21,24 @@ const TABLE = "/rest/v1/two_g_locks";
 
 export default {
   async email(message, env) {
-    const from = (message.from || "").trim().toLowerCase();
-    console.log("[2g] inbound from:", from);
-    if (!from) return;
+    // 1. 봉투 주소 대신, 실제 메일 헤더의 "From"을 가져옵니다.
+    const rawFrom = message.headers.get("From") || "";
+    console.log("[2g] raw From header:", rawFrom);
 
-    // 1) 가입 이메일로 활성 잠금 조회 (service_role → RLS 우회)
+    if (!rawFrom) return;
+
+    // 2. "이름 <email@domain.com>" 형태에서 꺾쇠 안의 순수 이메일만 추출합니다.
+    const emailMatch = rawFrom.match(/(?:<)(.+?)(?:>)/);
+    const from = (emailMatch ? emailMatch[1] : rawFrom).trim().toLowerCase();
+    
+    console.log("[2g] parsed inbound from:", from);
+
+    // 3) 가입 이메일로 활성 잠금 조회 (service_role → RLS 우회)
     const lock = await lookupLock(from, env);
     console.log("[2g] lock:", lock ? `FOUND (unlock_count=${lock.unlock_count})` : "NONE");
     if (!lock?.code) return; // 활성 잠금 없음 → 무시
 
-    // 2) 누적 해제 횟수만큼 지연 후 발송 (n회 해제 → n시간 뒤)
+    // 4) 누적 해제 횟수만큼 지연 후 발송 (n회 해제 → n시간 뒤)
     const delayHours = Math.max(0, lock.unlock_count || 0);
     await sendCode(from, lock.code, delayHours, env);
   },
@@ -38,7 +46,9 @@ export default {
 
 async function lookupLock(email, env) {
   try {
-    const url = `${env.SUPABASE_URL}${TABLE}?email=eq.${encodeURIComponent(email)}&select=code,unlock_count&limit=1`;
+    // 대소문자 무시 매칭(ilike) + 아직 기간이 끝나지 않은 활성 잠금만 발송
+    const now = new Date().toISOString();
+    const url = `${env.SUPABASE_URL}${TABLE}?email=ilike.${encodeURIComponent(email)}&ends_at=gt.${encodeURIComponent(now)}&select=code,unlock_count&limit=1`;
     const res = await fetch(url, {
       headers: {
         apikey: env.SUPABASE_SERVICE_KEY,

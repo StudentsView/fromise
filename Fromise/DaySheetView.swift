@@ -23,8 +23,12 @@ struct DaySheetView: View {
     @State private var hlHex: UInt = HL_HEX[0]
     @State private var isDrawing = false
     @State private var contentH: CGFloat = 1
-    @State private var ttDragging = false
-    @State private var ttDragErase = false
+    // 타임테이블: 드래그로 "선택"만 → 팔레트에서 색을 골라야 칠해짐 (오조작 방지 · 웹과 동일)
+    @State private var ttSelStart: Int? = nil           // 드래그 시작 셀 인덱스(row*6+col)
+    @State private var ttSelected: Set<String> = []     // 현재 선택된 셀 키들("row_col")
+    @State private var showPalette = false              // 색 팔레트(팝오버) 표시 여부
+    @State private var paletteAnchor: UnitPoint = .center  // 손 뗀 위치 기준 팝오버 앵커
+    @State private var ttCustomColor: Color = Color(hex: HL_HEX[0])  // 직접 선택 색
     @State private var penOnly = false   // 손가락 그리기 기본 허용 (iPhone은 항상 false)
     @State private var clearToken = 0     // 전체 지우기 강제 동기화용
     @State private var showClearAlert = false
@@ -169,16 +173,6 @@ struct DaySheetView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         }
     }
-    private func swatchRow(_ size: CGFloat) -> some View {
-        HStack(spacing: 5) {
-            ForEach(HL_HEX, id: \.self) { hex in
-                Circle().fill(Color(hex: hex)).frame(width: size, height: size)
-                    .overlay(Circle().stroke(hlHex == hex ? Theme.ink : Theme.line, lineWidth: hlHex == hex ? 2 : 1))
-                    .onTapGesture { hlHex = hex }
-            }
-        }
-    }
-
     // MARK: 본문 (카드들)
     private var content: some View {
         VStack(spacing: 14) {
@@ -285,15 +279,16 @@ struct DaySheetView: View {
         }
     }
 
-    // 타임테이블 (06시~, 22행 × 6칸) — 활성 형광펜 색으로 탭 칠하기
+    // 타임테이블 (06시~, 22행 × 6칸) — 드래그로 "선택" 후 팔레트에서 색을 골라 칠하기
     private var timetableCard: some View {
         sectionCard("타임 테이블") {
             VStack(spacing: 10) {
                 if mode == .type {
                     HStack(spacing: 6) {
-                        Text("색").font(.system(size: 11, weight: .heavy)).foregroundStyle(Theme.ink3)
-                        swatchRow(20); Spacer()
-                        Text("드래그로 칠하기").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.ink3)
+                        Icon(.highlighter, size: 12).foregroundStyle(Theme.ink3)
+                        Text("드래그해서 색을 칠하면 순공시간이 올라가요.")
+                            .font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.ink3)
+                        Spacer()
                     }
                 }
                 GeometryReader { geo in
@@ -307,11 +302,16 @@ struct DaySheetView: View {
                                     .font(.system(size: 10.5, weight: .bold)).foregroundStyle(Theme.ink3)
                                     .frame(width: labelW, height: rowH)
                                 ForEach(0..<6, id: \.self) { col in
-                                    let painted = store.day(key).timetable["\(r)_\(col)"]
+                                    let ck = "\(r)_\(col)"
+                                    let painted = store.day(key).timetable[ck]
+                                    let isSel = ttSelected.contains(ck)
                                     Rectangle()
                                         .fill(painted.map { Color(hex: $0) } ?? Color.clear)
                                         .frame(maxWidth: .infinity).frame(height: rowH)
-                                        .overlay(Rectangle().stroke(Theme.line.opacity(0.5), lineWidth: 0.5))
+                                        .overlay(isSel ? Theme.select.opacity(0.20) : Color.clear)
+                                        .overlay(Rectangle().stroke(isSel ? Theme.select : Theme.line.opacity(0.5),
+                                                                    lineWidth: isSel ? 1.5 : 0.5))
+                                        .animation(.easeOut(duration: 0.1), value: isSel)
                                 }
                             }
                         }
@@ -319,33 +319,101 @@ struct DaySheetView: View {
                     .contentShape(Rectangle())
                     .highPriorityGesture(
                         DragGesture(minimumDistance: 0)
-                            .onChanged { v in paintTimetable(v.location, labelW: labelW, cellW: cellW, rowH: rowH) }
-                            .onEnded { _ in ttDragging = false }
+                            .onChanged { v in updateSelection(v.location, labelW: labelW, cellW: cellW, rowH: rowH) }
+                            .onEnded { v in endSelection(v.location, size: geo.size) }
                     )
                 }
                 .frame(height: 24 * 22)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.line, lineWidth: 1))
+                .popover(isPresented: $showPalette, attachmentAnchor: .point(paletteAnchor), arrowEdge: .top) {
+                    timetablePalette.presentationCompactAdaptation(.popover)
+                }
+                .onChange(of: showPalette) { _, shown in
+                    if !shown { ttSelected = []; ttSelStart = nil }   // 팝오버 닫히면 선택 해제
+                }
             }
         }
     }
 
-    /// 드래그 위치 → 셀 좌표 계산 후 칠하기/지우기 (첫 셀이 같은 색이면 지우기 모드)
-    private func paintTimetable(_ loc: CGPoint, labelW: CGFloat, cellW: CGFloat, rowH: CGFloat) {
-        let x = loc.x - labelW
-        guard x >= 0 else { return }
-        let col = Int(x / cellW), row = Int(loc.y / rowH)
-        guard (0..<6).contains(col), (0..<22).contains(row) else { return }
-        let ck = "\(row)_\(col)"
-        if !ttDragging {
-            ttDragging = true
-            ttDragErase = (store.day(key).timetable[ck] == hlHex)
+    // 색 팔레트 (웹 팝오버와 동일 구성: 6색 + 직접 선택 + 지움)
+    private var timetablePalette: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("선택한 시간에 칠할 색")
+                .font(.system(size: 11, weight: .heavy)).foregroundStyle(Theme.ink3)
+            HStack(spacing: 10) {
+                ForEach(Array(HL_HEX.enumerated()), id: \.offset) { _, hex in
+                    Button { applyTTColor(hex) } label: {
+                        Circle().fill(Color(hex: hex)).frame(width: 28, height: 28)
+                            .overlay(Circle().stroke(Theme.line, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            HStack(spacing: 12) {
+                HStack(spacing: 6) {
+                    ColorPicker("", selection: $ttCustomColor, supportsOpacity: false).labelsHidden()
+                    Text("직접 선택").font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.ink2)
+                }
+                Spacer(minLength: 8)
+                Button { applyTTColor(nil) } label: {
+                    Text("지움").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.danger)
+                        .padding(.horizontal, 12).padding(.vertical, 7)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.line, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
         }
-        if ttDragErase { day.wrappedValue.timetable[ck] = nil }
-        else { day.wrappedValue.timetable[ck] = hlHex }
-        // 칸당 10분 → 순공시간 자동 반영
-        let count = day.wrappedValue.timetable.count
-        day.wrappedValue.netMinutes = count > 0 ? count * 10 : nil
+        .padding(14)
+        .frame(width: 264)
+        .onChange(of: ttCustomColor) { _, c in applyTTColor(hex(from: c)) }
+    }
+
+    /// 드래그 위치 → 셀 인덱스 범위로 "선택"만 함 (웹의 .sel 토글과 동일, 색칠 X)
+    private func updateSelection(_ loc: CGPoint, labelW: CGFloat, cellW: CGFloat, rowH: CGFloat) {
+        if showPalette { return }   // 팔레트 떠 있는 동안엔 무시
+        let x = loc.x - labelW
+        let col = Int(x / cellW), row = Int(loc.y / rowH)
+        guard x >= 0, (0..<6).contains(col), (0..<22).contains(row) else { return }
+        let idx = row * 6 + col
+        if ttSelStart == nil { ttSelStart = idx }
+        let lo = min(ttSelStart!, idx), hi = max(ttSelStart!, idx)
+        var sel = Set<String>(); sel.reserveCapacity(hi - lo + 1)
+        for i in lo...hi { sel.insert("\(i / 6)_\(i % 6)") }
+        ttSelected = sel
+    }
+
+    /// 드래그 끝 → 선택이 있으면 손 뗀 위치에 색 팔레트를 띄움
+    private func endSelection(_ loc: CGPoint, size: CGSize) {
+        ttSelStart = nil
+        guard !ttSelected.isEmpty else { return }
+        let gx = min(max(loc.x, 0), size.width)
+        let gy = min(max(loc.y, 0), size.height)
+        paletteAnchor = UnitPoint(x: size.width  > 0 ? gx / size.width  : 0.5,
+                                  y: size.height > 0 ? gy / size.height : 0.5)
+        showPalette = true
+    }
+
+    /// 선택된 셀들에 색 적용(nil이면 지우기) → 순공시간 자동 반영 후 팔레트 닫기
+    private func applyTTColor(_ hex: UInt?) {
+        guard !ttSelected.isEmpty else { showPalette = false; return }
+        var d = day.wrappedValue
+        for ck in ttSelected {
+            if let hex { d.timetable[ck] = hex } else { d.timetable[ck] = nil }
+        }
+        d.netMinutes = d.timetable.count > 0 ? d.timetable.count * 10 : nil   // 칸당 10분
+        day.wrappedValue = d
+        showPalette = false   // onChange(showPalette)에서 선택 해제됨
+    }
+
+    /// SwiftUI Color → 0xRRGGBB
+    private func hex(from color: Color) -> UInt {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(color).getRed(&r, green: &g, blue: &b, alpha: &a)
+        let R = UInt((max(0, min(1, r)) * 255).rounded())
+        let G = UInt((max(0, min(1, g)) * 255).rounded())
+        let B = UInt((max(0, min(1, b)) * 255).rounded())
+        return (R << 16) | (G << 8) | B
     }
 
     // MARK: 공용 조각

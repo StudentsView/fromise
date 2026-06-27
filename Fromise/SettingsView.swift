@@ -1,4 +1,5 @@
 import SwiftUI
+import SafariServices
 
 // ─────────────────────────────────────────────────────────────
 //  SettingsView.swift — 간단 설정 (계정 · 프로필)
@@ -17,6 +18,7 @@ struct SettingsView: View {
     @State private var showBirth = false
     @Environment(\.openURL) private var openURL
     @Binding var path: [SettingsRoute]
+    @State private var showAnnouncement = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -63,6 +65,10 @@ struct SettingsView: View {
                         Button { openInquiry() } label: {
                             row("문의하기", value: "support@fromise.com", chevron: true)
                         }.buttonStyle(.plain)
+                        divider
+                        Button { showAnnouncement = true } label: {
+                            row("공지사항", value: "", chevron: true)
+                            }.buttonStyle(.plain)   // ← 새로 추가됨
                     }
 
                     Text("지금 이 자리에서부터\n함께할 그날까지")
@@ -84,6 +90,7 @@ struct SettingsView: View {
         .sheet(isPresented: $showNick) { NicknameSheet() }
         .sheet(isPresented: $showFeedback) { FeedbackSheet(defaultEmail: auth.email) }
         .sheet(isPresented: $showBirth) { BirthEditSheet() }
+        .sheet(isPresented: $showAnnouncement) { AnnouncementWebView() }
     }
 
     private func openInquiry() {
@@ -112,13 +119,26 @@ struct SettingsView: View {
 
     private func row(_ label: String, value: String, chevron: Bool = false) -> some View {
         HStack {
-            Text(label).font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.ink2)
+            Text(label)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.ink2)
+            
             Spacer()
-            Text(value).font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.ink)
-                .lineLimit(1).truncationMode(.tail)
-            if chevron { Icon(.chevronRight, size: 12).foregroundStyle(Theme.ink3).padding(.leading, 4) }
+            
+            Text(value)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Theme.ink)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            
+            if chevron {
+                Icon(.chevronRight, size: 12)
+                    .foregroundStyle(Theme.ink3)
+                    .padding(.leading, 4)
+            }
         }
-        .padding(.vertical, 11)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())   // ← 전체 영역(라벨 + 스페이서 + 화살표)을 터치 가능하게 확장
     }
     private var divider: some View { Rectangle().fill(Theme.line).frame(height: 1) }
 
@@ -176,4 +196,30 @@ struct BirthEditSheet: View {
         SyncQueue.shared.queueBirth(date)
         dismiss()
     }
+}
+
+// MARK: - 공지사항 웹뷰 (SFSafariViewController)
+struct AnnouncementWebView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            SafariWebView(url: URL(string: "https://support.fromise.com/announcement")!)
+                .ignoresSafeArea()
+                .navigationTitle("공지사항")
+                .navigationBarTitleDisplayMode(.inline)
+            // toolbar(닫기 버튼) 완전히 제거
+        }
+    }
+}
+struct SafariWebView: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        let configuration = SFSafariViewController.Configuration()
+        configuration.entersReaderIfAvailable = false
+        return SFSafariViewController(url: url, configuration: configuration)
+    }
+
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
 }
